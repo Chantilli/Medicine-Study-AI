@@ -15,7 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 
+
 EXPOSE 7860
 
 
-CMD ["flet", "run", "app.py", "--web", "--port", "7860"]
+CMD ["flet", "run", "app.py", "--web", "--port", "7860", "--server"]
