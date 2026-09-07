@@ -1,0 +1,20 @@
+name: Sincronizar a Hugging Face Hub
+
+on:
+  push:
+    branches: [main] 
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v6 
+
+      - name: Sincronizar con Hugging Face
+        uses: huggingface/hub-sync@v0.1.0 
+        with:
+          github_repo_id: ${{ github.repository }}
+          huggingface_repo_id: Chantilli/medicine-ai-app
+          hf_token: ${{ secrets.HF_TOKEN }}
+          repo_type: space
