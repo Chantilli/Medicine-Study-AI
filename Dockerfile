@@ -15,8 +15,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 
+ENV FLET_SERVER_PORT=7860
+ENV FLET_FORCE_WEB_SERVER=true
+
 
 EXPOSE 7860
 
 
-CMD ["flet", "run", "app.py", "--web", "--port", "7860", "--server"]
+CMD ["python", "app.py"]
