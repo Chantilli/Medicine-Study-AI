@@ -3,10 +3,10 @@ title: Medicine Ai App
 emoji: 🐢
 colorFrom: blue
 colorTo: indigo
-sdk: flet
-app_file: main.py
+sdk: docker
 pinned: false
 ---
+
 
 
 
