@@ -12,9 +12,10 @@ jobs:
         uses: actions/checkout@v6 
 
       - name: Sincronizar con Hugging Face
-        uses: huggingface/hub-sync@v0.1.0 
+        uses: huggingface/hub-sync@v0.1.0
         with:
-          github_repo_id: ${{ github.repository }}
+          github_repo_id: Chantilli/Medicine-Study-AI
           huggingface_repo_id: Chantilli/medicine-ai-app
           hf_token: ${{ secrets.HF_TOKEN }}
           repo_type: space
+
