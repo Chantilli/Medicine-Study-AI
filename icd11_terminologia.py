@@ -34,25 +34,16 @@ import requests
 TOKEN_URL = "https://icdaccessmanagement.who.int/connect/token"
 SEARCH_URL = "https://id.who.int/icd/release/11/2024-01/mms/search"
 
-# Mapea los códigos de idioma de la app al valor que espera el header
-# Accept-Language de la API de ICD-11. Si en el futuro la app soporta un
-# idioma que la OMS no tiene traducido, cae a inglés en vez de fallar.
 _IDIOMA_A_ACCEPT_LANGUAGE = {"es": "es", "en": "en", "fr": "fr", "de": "de", "zh": "zh"}
 
 _PATRON_HTML = re.compile(r"<[^>]+>")
 
-# La API de la OMS resalta coincidencias envolviéndolas en
-# <em class='found'>...</em> — no sirve para mostrarle esto al
-# estudiante, se limpia antes de devolver cualquier resultado.
 def _limpiar_html(texto: str) -> str:
     if not texto:
         return ""
     return _PATRON_HTML.sub("", texto).strip()
 
 
-# El token OAuth2 dura ~1 hora (expires_in en la respuesta de la OMS) —
-# se cachea en memoria del proceso para no pedir uno nuevo en cada
-# búsqueda, solo cuando el actual ya venció o está por vencer.
 _cache_token = {"valor": None, "expira_en": 0.0}
 
 
