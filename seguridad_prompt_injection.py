@@ -35,8 +35,6 @@ def _normalizar(texto: str) -> str:
     return "".join(c for c in texto if not unicodedata.combining(c))
 
 
-# (nombre_patron, regex) — nombres cortos y legibles, para que las
-# alertas en la UI digan algo más útil que "patrón #7".
 PATRONES_INYECCION = [
     ("ignora_instrucciones_es", r"ignor[ae]\s+(todas\s+)?las\s+instruccion(es)?\s+(anteriores|previas|del\s+sistema)"),
     ("ignore_instructions_en", r"ignore\s+(all\s+)?(the\s+)?(previous|prior|above)\s+instructions"),
