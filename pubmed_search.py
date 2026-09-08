@@ -668,15 +668,6 @@ def buscar_europepmc(query: str, retmax: int = 10) -> list:
         return []
 
 
-# =====================================================================
-# Semantic Scholar (Allen Institute for AI) — tercera fuente. Cobertura
-# multidisciplinaria amplia que incluye biomedicina, más útil sobre todo
-# cuando la pregunta toca fisiología/farmacología a nivel de mecanismo
-# donde PubMed/Europe PMC a veces no traen tanto volumen. No requiere
-# API key para uso básico (hay un límite de tasa compartido público,
-# suficiente para el volumen de esta app — si algún día se necesita más,
-# se puede agregar S2_API_KEY como variable de entorno opcional).
-# =====================================================================
 
 SEMANTIC_SCHOLAR_BASE = "https://api.semanticscholar.org/graph/v1/paper/search"
 
