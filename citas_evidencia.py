@@ -184,30 +184,25 @@ def detectar_citas_fuera_de_rango(respuesta: str, n_papers: int, n_fragmentos: i
     }
 
 _PATRONES_NEGACION_EVIDENCIA = [
-    # Español
     r"no encontr[ée] papers",
     r"no encontr[ée] evidencia",
     r"no tengo papers verificados",
     r"no tengo evidencia",
     r"sin (acceso a |ning[uú]n )?papers?",
-    # English — la app ahora también responde en inglés (Fase 8, multilingüe)
     r"did\s*n['’]?t find (any )?(PubMed )?papers",
     r"did not find (any )?(PubMed )?papers",
     r"could\s*n['’]?t find (any )?evidence",
     r"no verified papers",
     r"without (access to )?(any )?papers?",
     r"no papers (were )?found",
-    # Français — mismo motivo, tercer idioma soportado
     r"n['’]ai (pas )?trouv[ée] .{0,15}articles?",
     r"aucun article .{0,10}trouv[ée]",
     r"pas de preuves? v[ée]rifi[ée]es?",
     r"sans (acc[èe]s [àa] )?(aucun )?articles?",
-    # Deutsch — mismo motivo, cuarto idioma soportado
     r"keine (PubMed[- ])?(studien|artikel|papers?).{0,30}gefunden",
     r"keine (verifizierte[n]? )?evidenz",
     r"ohne (zugriff auf )?(irgendwelche )?(studien|artikel|papers?)",
     r"konnte keine (evidenz|studien|artikel) finden",
-    # 中文（简体）— quinto idioma soportado
     r"没有找到.{0,25}(文献|论文|证据)",
     r"没有.{0,5}证据",
     r"未找到.{0,10}(文献|论文)",
@@ -229,8 +224,6 @@ def detectar_negacion_contradictoria(respuesta: str, n_papers: int, n_fragmentos
 
 
 _PATRONES_FRASE_NEGACION_COMPLETA = [
-    # Debe calzar con las frases exactas de config.py IDIOMAS[...]["frase_sin_papers"]
-    # — si esas frases cambian ahí, hay que actualizar esto también.
     re.compile(r"No encontr[ée] papers de PubMed para citar en esta consulta[^.]*\.\s*", re.IGNORECASE),
     re.compile(r"I did\s*n['’]?t find (any )?PubMed papers to cite for this (query|question)[^.]*\.\s*", re.IGNORECASE),
     re.compile(r"Je n['’]?ai trouv[ée] aucun article PubMed [^.]*\.\s*", re.IGNORECASE),
@@ -399,7 +392,7 @@ def resumen_evidencia_citada(fuentes: list) -> dict:
         try:
             return _ORDEN_JERARQUIA_EVIDENCIA.index(nivel)
         except ValueError:
-            return len(_ORDEN_JERARQUIA_EVIDENCIA)  # "Sin clasificar" u otro desconocido -> al final
+            return len(_ORDEN_JERARQUIA_EVIDENCIA)
 
     niveles_unicos = []
     vistos = set()
@@ -482,4 +475,3 @@ def evaluar_factualidad(respuesta: str, contexto_fuentes: str):
         return _parsear_json_juez(respuesta_juez.choices[0].message.content or "")
     except Exception:
         return None
-
