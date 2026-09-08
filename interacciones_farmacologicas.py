@@ -32,10 +32,6 @@ def _normalizar(texto: str) -> str:
     return "".join(c for c in texto if not unicodedata.combining(c))
 
 
-# Alias -> nombre canónico. Incluye genéricos, algunos nombres
-# comerciales de uso frecuente en habla hispana, y clases terapéuticas
-# completas cuando la interacción aplica a toda la clase (ej. "imao",
-# "isrs", "macrolido") en vez de a un solo fármaco.
 ALIAS_FARMACOS = {
     "acido acetilsalicilico": "aspirina", "asa": "aspirina", "aspirina": "aspirina",
     "paracetamol": "paracetamol", "acetaminofen": "paracetamol", "acetaminofeno": "paracetamol",
@@ -92,7 +88,6 @@ def _par(a, b):
     return frozenset({a, b})
 
 
-# Base curada: clave = frozenset de dos nombres canónicos.
 BASE_INTERACCIONES = {
     _par("warfarina", "aspirina"): {
         "severidad": "Mayor", "mecanismo": "Efecto antiagregante + anticoagulante sumados",
@@ -257,9 +252,6 @@ def verificar_interacciones(lista_farmacos: list) -> dict:
     vistos = set()
     nombres_unicos = []
     for n in nombres_limpios:
-        # Deduplicar por nombre CANÓNICO (post-alias), no por texto crudo:
-        # "ASA" y "Aspirina" son el mismo fármaco y no deben generar un
-        # par consigo mismo ni duplicar las interacciones encontradas.
         clave = normalizar_nombre_farmaco(n)
         if clave and clave not in vistos:
             vistos.add(clave)
