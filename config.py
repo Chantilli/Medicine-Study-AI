@@ -231,6 +231,4 @@ def construir_system_prompt(codigo_idioma: str = IDIOMA_POR_DEFECTO) -> dict:
     return {"role": "system", "content": contenido}
 
 
-# Se mantiene por compatibilidad con cualquier código que aún importe
-# SYSTEM_PROMPT directamente — equivale al idioma por defecto (español).
 SYSTEM_PROMPT = construir_system_prompt(IDIOMA_POR_DEFECTO)
