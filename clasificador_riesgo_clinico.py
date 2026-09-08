@@ -51,13 +51,9 @@ _YO_ES = r"\b(yo|me|mi|mis|estoy|tengo|siento|padezco|sufro|no\s+puedo)\b"
 _YO_EN = r"\b(i|i'?m|i\s+am|my|i\s+have|i\s+feel|i\s+can'?t|i\s+cannot)\b"
 _YO_FR = r"\b(je|j'ai|je\s+suis|mon|ma|mes|je\s+ne\s+peux\s+pas|je\s+n'arrive\s+pas)\b"
 _YO_DE = r"\b(ich|ich\s+habe|ich\s+bin|mein|meine|ich\s+kann\s+nicht|ich\s+fuhle|ich\s+fühle)\b"
-# Chino: sin espacios entre palabras, así que no se usa \b/\s+ — basta con
-# que 我 (yo) o 我的 (mi/mío) aparezca cerca del síntoma.
 _YO_ZH = r"(我的|我)"
 
-# --- Emergencia médica aguda: síntoma agudo + framing en primera persona ---
 PATRONES_EMERGENCIA_MEDICA = [
-    # Español
     ("dolor_toracico_agudo_es", rf"{_YO_ES}.{{0,40}}(dolor\s+(en\s+el\s+|de\s+)?pecho|dolor\s+toracico).{{0,60}}"
                                   rf"(no\s+puedo\s+respirar|falta\s+de\s+aire|sudo|brazo\s+izquierdo|mareo)"),
     ("dificultad_respiratoria_aguda_es", rf"{_YO_ES}.{{0,30}}(no\s+puedo\s+respirar|me\s+estoy\s+ahogando|"
@@ -70,7 +66,6 @@ PATRONES_EMERGENCIA_MEDICA = [
                                        r".{0,30}(ahora|en\s+este\s+momento|justo\s+ahora)"),
     ("reaccion_alergica_grave_es", rf"{_YO_ES}.{{0,30}}(se\s+me\s+cerro\s+la\s+garganta|no\s+puedo\s+tragar|"
                                     rf"me\s+esta\s+hinchando\s+la\s+cara)"),
-    # English
     ("dolor_toracico_agudo_en", rf"{_YO_EN}.{{0,40}}(chest\s+pain).{{0,60}}"
                                   rf"(can'?t\s+breathe|short(ness)?\s+of\s+breath|sweating|left\s+arm|dizzy)"),
     ("dificultad_respiratoria_aguda_en", rf"{_YO_EN}.{{0,30}}(can'?t\s+breathe|choking|"
@@ -82,7 +77,6 @@ PATRONES_EMERGENCIA_MEDICA = [
                                        r".{0,30}(right\s+now|just\s+now)"),
     ("reaccion_alergica_grave_en", rf"{_YO_EN}.{{0,30}}(throat\s+(is\s+)?closing|can'?t\s+swallow|"
                                     rf"face\s+(is\s+)?swelling)"),
-    # Français
     ("dolor_toracico_agudo_fr", rf"{_YO_FR}.{{0,40}}(douleur\s+(a\s+la\s+|dans\s+la\s+)?poitrine|douleur\s+thoracique)"
                                   rf".{{0,60}}(n'arrive\s+pas\s+a\s+respirer|essoufflement|transpire|bras\s+gauche|vertige)"),
     ("dificultad_respiratoria_aguda_fr", rf"{_YO_FR}.{{0,30}}(n'arrive\s+pas\s+a\s+respirer|je\s+m'etouffe|"
@@ -95,7 +89,6 @@ PATRONES_EMERGENCIA_MEDICA = [
                                        r".{0,30}(maintenant|a\s+l'instant)"),
     ("reaccion_alergica_grave_fr", rf"{_YO_FR}.{{0,30}}(gorge\s+se\s+ferme|n'arrive\s+pas\s+a\s+avaler|"
                                     rf"visage\s+(qui\s+)?gonfle)"),
-    # Deutsch
     ("dolor_toracico_agudo_de", rf"{_YO_DE}.{{0,40}}(brustschmerzen|schmerzen\s+in\s+der\s+brust)"
                                   rf".{{0,60}}(kann\s+nicht\s+atmen|atemnot|schwitze|linker\s+arm|schwindel)"),
     ("dificultad_respiratoria_aguda_de", rf"{_YO_DE}.{{0,30}}(kann\s+nicht\s+atmen|ich\s+ersticke|"
@@ -108,7 +101,6 @@ PATRONES_EMERGENCIA_MEDICA = [
                                        r"reagiert\s+nicht).{0,30}(jetzt|gerade)"),
     ("reaccion_alergica_grave_de", rf"{_YO_DE}.{{0,30}}(hals\s+schnurt\s+zu|kann\s+nicht\s+schlucken|"
                                     rf"gesicht\s+schwillt\s+an)"),
-    # 中文（简体）
     ("dolor_toracico_agudo_zh", rf"{_YO_ZH}.{{0,20}}(胸痛|胸部疼痛).{{0,30}}(无法呼吸|呼吸困难|出汗|左臂|头晕)"),
     ("dificultad_respiratoria_aguda_zh", rf"{_YO_ZH}.{{0,15}}(无法呼吸|喘不过气|呼吸(非常)?困难)"),
     ("sangrado_severo_zh", rf"{_YO_ZH}.{{0,15}}(大量出血|流血不止|出血严重)"),
@@ -118,42 +110,34 @@ PATRONES_EMERGENCIA_MEDICA = [
     ("reaccion_alergica_grave_zh", rf"{_YO_ZH}.{{0,15}}(喉咙.{{0,5}}肿|无法吞咽|脸.{{0,5}}肿)"),
 ]
 
-# --- Autolesión / crisis de salud mental EN CURSO ---
 PATRONES_EMERGENCIA_SALUD_MENTAL = [
-    # Español
     ("ideacion_suicida_es", r"(quiero|voy\s+a|pienso\s+en|estoy\s+pensando\s+en)\s+"
                               r"(matarme|suicidarme|quitarme\s+la\s+vida)"),
     ("no_quiero_vivir_es", r"no\s+quiero\s+(seguir\s+vivi[ae]ndo|vivir\s+mas|existir\s+mas)"),
     ("autolesion_actual_es", r"(me\s+estoy\s+cortando|me\s+quiero\s+hacer\s+dano|"
                                r"me\s+lastime\s+a\s+proposito|me\s+voy\s+a\s+lastimar)"),
-    # English
     ("ideacion_suicida_en", r"(i\s+want\s+to|i'?m\s+going\s+to|i'?m\s+thinking\s+about)\s+"
                               r"(kill\s+myself|end\s+my\s+life|commit\s+suicide)"),
     ("no_quiero_vivir_en", r"(i\s+don'?t\s+want\s+to\s+live|i\s+don'?t\s+want\s+to\s+keep\s+living|"
                              r"i\s+don'?t\s+want\s+to\s+exist)"),
     ("autolesion_actual_en", r"(i'?m\s+cutting\s+myself|i\s+want\s+to\s+hurt\s+myself|"
                                r"i'?m\s+going\s+to\s+hurt\s+myself|i\s+hurt\s+myself\s+on\s+purpose)"),
-    # Français
     ("ideacion_suicida_fr", r"(je\s+veux|je\s+vais|je\s+pense\s+a)\s+"
                               r"(me\s+tuer|me\s+suicider|mettre\s+fin\s+a\s+mes\s+jours)"),
     ("no_quiero_vivir_fr", r"je\s+ne\s+veux\s+plus\s+(vivre|continuer\s+a\s+vivre|exister)"),
     ("autolesion_actual_fr", r"(je\s+suis\s+en\s+train\s+de\s+me\s+couper|je\s+veux\s+me\s+faire\s+du\s+mal|"
                                r"je\s+vais\s+me\s+faire\s+du\s+mal)"),
-    # Deutsch
     ("ideacion_suicida_de", r"(ich\s+will|ich\s+werde)\s+(mich\s+umbringen|mich\s+toten|selbstmord\s+begehen)"),
     ("ideacion_suicida_de_zu", r"ich\s+denke\s+daran,?\s+(mich\s+umzubringen|mich\s+zu\s+toten|selbstmord\s+zu\s+begehen)"),
     ("no_quiero_vivir_de", r"ich\s+will\s+nicht\s+mehr\s+(leben|weiterleben|existieren)"),
     ("autolesion_actual_de", r"(ich\s+schneide\s+mich\s+gerade|ich\s+will\s+mir\s+selbst\s+schaden|"
                                r"ich\s+werde\s+mir\s+selbst\s+schaden)"),
-    # 中文（简体）
     ("ideacion_suicida_zh", r"(我想|我要|我在想).{0,5}(自杀|结束自己的生命|杀死自己)"),
     ("no_quiero_vivir_zh", r"我不想.{0,10}(活了|再活下去|继续活着)"),
     ("autolesion_actual_zh", r"(我在割自己|我想伤害自己|我要伤害自己|我故意伤害自己)"),
 ]
 
-# --- Consejo médico personal (no urgente, pero personal — no un caso de estudio) ---
 PATRONES_RIESGO_PERSONAL = [
-    # Español
     ("sintoma_personal_diagnostico_es", rf"{_YO_ES}.{{0,40}}(que\s+tengo|es\s+grave|deberia\s+preocuparme|"
                                           rf"es\s+normal\s+que\s+me)"),
     ("dosis_personal_es", r"(mi\s+dosis|mi\s+medicamento|estoy\s+tomando).{0,60}"
@@ -163,7 +147,6 @@ PATRONES_RIESGO_PERSONAL = [
     ("pregunta_dosis_directa_personal_es", rf"{_YO_ES}.{{0,30}}cuanto\s+(debo|puedo)\s+tomar"),
     ("autodiagnostico_directo_es", rf"{_YO_ES}.{{0,20}}(estos\s+sintomas|estas\s+molestias).{{0,30}}"
                                     rf"(que\s+podria\s+ser|que\s+enfermedad)"),
-    # English
     ("sintoma_personal_diagnostico_en", rf"{_YO_EN}.{{0,40}}(what\s+do\s+i\s+have|is\s+this\s+serious|"
                                           rf"should\s+i\s+be\s+worried)"),
     ("dosis_personal_en", r"(my\s+dose|my\s+medication|i'?m\s+taking).{0,60}"
@@ -173,7 +156,6 @@ PATRONES_RIESGO_PERSONAL = [
     ("pregunta_dosis_directa_personal_en", rf"{_YO_EN}.{{0,30}}how\s+much\s+(should|can)\s+i\s+take"),
     ("autodiagnostico_directo_en", rf"{_YO_EN}.{{0,20}}(these\s+symptoms|this\s+discomfort).{{0,30}}"
                                     rf"(what\s+could\s+(this|it)\s+be|what\s+(disease|condition))"),
-    # Français
     ("sintoma_personal_diagnostico_fr", rf"{_YO_FR}.{{0,40}}(qu'est[- ]ce\s+que\s+j'ai|est[- ]ce\s+grave|"
                                           rf"devrais[- ]je\s+m'inquieter)"),
     ("dosis_personal_fr", r"(ma\s+dose|mon\s+medicament|je\s+prends).{0,60}"
@@ -183,7 +165,6 @@ PATRONES_RIESGO_PERSONAL = [
     ("pregunta_dosis_directa_personal_fr", rf"{_YO_FR}.{{0,30}}combien\s+(dois|puis)[- ]je\s+prendre"),
     ("autodiagnostico_directo_fr", rf"{_YO_FR}.{{0,20}}(ces\s+symptomes|ce\s+malaise).{{0,30}}"
                                     rf"(qu'est[- ]ce\s+que\s+ca\s+pourrait\s+etre|quelle\s+maladie)"),
-    # Deutsch
     ("sintoma_personal_diagnostico_de", rf"{_YO_DE}.{{0,40}}(was\s+habe\s+ich|ist\s+das\s+ernst|"
                                           rf"sollte\s+ich\s+mir\s+sorgen\s+machen)"),
     ("dosis_personal_de", r"(meine\s+dosis|mein\s+medikament|ich\s+nehme).{0,60}"
@@ -193,7 +174,6 @@ PATRONES_RIESGO_PERSONAL = [
     ("pregunta_dosis_directa_personal_de", rf"{_YO_DE}.{{0,30}}wie\s+viel\s+(sollte|kann)\s+ich\s+nehmen"),
     ("autodiagnostico_directo_de", rf"{_YO_DE}.{{0,20}}(diese\s+symptome|diese\s+beschwerden).{{0,30}}"
                                     rf"(was\s+konnte\s+das\s+sein|welche\s+krankheit)"),
-    # 中文（简体）
     ("sintoma_personal_diagnostico_zh", rf"{_YO_ZH}.{{0,15}}(得了什么病|严重吗|应该担心吗)"),
     ("dosis_personal_zh", r"(我的剂量|我的药|我在吃).{0,20}(应该|可以).{0,10}(增加|减少|停止|更换|吃)"),
     ("interaccion_personal_zh", r"(我在吃|我服用|医生给我开了).{0,20}(可以.{0,5}吃|吃.{0,5}安全吗|可以一起吃吗)"),
@@ -236,19 +216,6 @@ def clasificar_consulta(texto: str) -> dict:
     return {"categoria": "educativo", "subtipo": None, "señales": []}
 
 
-# ---------------------------------------------------------------------
-# Mensajes — centralizados aquí para que el texto exacto que ve el
-# estudiante sea fácil de auditar/editar en un solo lugar.
-#
-# Multilingües a propósito y con especial cuidado en la traducción
-# (más que cualquier otro texto de la app): son mensajes de seguridad
-# que se muestran en el peor momento posible — si el estudiante tiene
-# la UI en inglés o francés, un mensaje de emergencia en español que no
-# entiende bien podría costarle segundos que importan. Los números de
-# emergencia (911, Línea de la Vida) se mantienen igual en los 3
-# idiomas porque son específicos de México — el texto alrededor se
-# traduce, no el número.
-# ---------------------------------------------------------------------
 
 _MENSAJE_EMERGENCIA_MEDICA_POR_IDIOMA = {
     "es": (
@@ -435,10 +402,6 @@ def instruccion_refuerzo_riesgo_personal(idioma: str = "es") -> str:
     return _msg(_INSTRUCCION_REFUERZO_RIESGO_PERSONAL_POR_IDIOMA, idioma)
 
 
-# Compatibilidad hacia atrás: código existente que importe estas
-# constantes directamente sigue funcionando (equivalen al idioma por
-# defecto, español) — pero app_ui.py ahora usa las funciones de arriba
-# con el idioma seleccionado por el estudiante.
 MENSAJE_EMERGENCIA_MEDICA = mensaje_emergencia_medica("es")
 MENSAJE_EMERGENCIA_SALUD_MENTAL = mensaje_emergencia_salud_mental("es")
 AVISO_RIESGO_PERSONAL = aviso_riesgo_personal("es")
