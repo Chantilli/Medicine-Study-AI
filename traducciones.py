@@ -22,9 +22,6 @@ interacciones_farmacologicas.py.
 """
 
 TEXTOS = {
-    # ---------------------------------------------------------------
-    # Sidebar / navegación general
-    # ---------------------------------------------------------------
     "sidebar_titulo": {"es": "Medicine AI", "en": "Medicine AI", "fr": "Medicine AI", "de": "Medicine AI", "zh": "Medicine AI"},
     "cerrar_sesion": {"es": "Cerrar sesión", "en": "Log out", "fr": "Se déconnecter", "de": "Abmelden", "zh": "退出登录"},
     "nuevo_chat": {"es": "+ Nuevo Chat", "en": "+ New Chat", "fr": "+ Nouvelle conversation", "de": "+ Neuer Chat", "zh": "+ 新对话"},
@@ -70,17 +67,11 @@ TEXTOS = {
     "cancelar": {"es": "Cancelar", "en": "Cancel", "fr": "Annuler", "de": "Abbrechen", "zh": "取消"},
     "eliminar": {"es": "Eliminar", "en": "Delete", "fr": "Supprimer", "de": "Löschen", "zh": "删除"},
 
-    # ---------------------------------------------------------------
-    # Modos de evidencia (dropdown "Nivel de evidencia")
-    # ---------------------------------------------------------------
     "modo_evidencia_todo": {"es": "Todo", "en": "All", "fr": "Tout", "de": "Alles", "zh": "全部"},
     "modo_evidencia_primaria": {"es": "Solo evidencia primaria", "en": "Primary evidence only", "fr": "Preuves primaires seulement", "de": "Nur Primärevidenz", "zh": "仅一手证据"},
     "modo_evidencia_revision_guia": {"es": "Revisiones y guías", "en": "Reviews and guidelines", "fr": "Revues et recommandations", "de": "Übersichtsarbeiten und Leitlinien", "zh": "综述与指南"},
     "modo_evidencia_sin_opiniones": {"es": "Ocultar opiniones", "en": "Hide opinions", "fr": "Masquer les opinions", "de": "Meinungen ausblenden", "zh": "隐藏观点类文献"},
 
-    # ---------------------------------------------------------------
-    # Pantalla de bienvenida
-    # ---------------------------------------------------------------
     "bienvenida_subtitulo": {
         "es": "Tu asistente de estudio para medicina — con evidencia citable y verificación de factualidad",
         "en": "Your medical study assistant — with citable evidence and factuality verification",
@@ -140,9 +131,6 @@ TEXTOS = {
         "zh": "二甲双胍的作用机制",
     },
 
-    # ---------------------------------------------------------------
-    # Proceso / indicadores de carga (panel colapsable "Ver proceso")
-    # ---------------------------------------------------------------
     "ver_proceso": {"es": "Ver proceso", "en": "View process", "fr": "Voir le processus", "de": "Prozess anzeigen", "zh": "查看处理过程"},
     "buscando_pubmed": {"es": "Buscando en PubMed...", "en": "Searching PubMed...", "fr": "Recherche dans PubMed...", "de": "Suche in PubMed...", "zh": "正在搜索 PubMed…"},
     "generando_respuesta": {"es": "Generando respuesta...", "en": "Generating response...", "fr": "Génération de la réponse...", "de": "Antwort wird erstellt...", "zh": "正在生成回答…"},
@@ -150,10 +138,6 @@ TEXTOS = {
     "verificando_afirmaciones": {"es": "Verificando afirmaciones...", "en": "Verifying claims...", "fr": "Vérification des affirmations...", "de": "Aussagen werden geprüft...", "zh": "正在核实陈述…"},
     "afirmaciones_verificadas": {"es": "Afirmaciones verificadas", "en": "Claims verified", "fr": "Affirmations vérifiées", "de": "Aussagen geprüft", "zh": "陈述已核实"},
 
-    # ---------------------------------------------------------------
-    # Niveles de jerarquía de evidencia (pubmed_search.py) — se muestran
-    # vía t_categoria() en el badge de evidencia citada.
-    # ---------------------------------------------------------------
     "niv_meta_analisis": {"es": "Revisión (meta-análisis)", "en": "Review (meta-analysis)", "fr": "Revue (méta-analyse)", "de": "Übersichtsarbeit (Metaanalyse)", "zh": "综述（荟萃分析）"},
     "niv_revision_sistematica": {"es": "Revisión (sistemática)", "en": "Review (systematic)", "fr": "Revue (systématique)", "de": "Übersichtsarbeit (systematisch)", "zh": "综述（系统性）"},
     "niv_guia_clinica": {"es": "Guía clínica", "en": "Clinical guideline", "fr": "Recommandation clinique", "de": "Klinische Leitlinie", "zh": "临床指南"},
@@ -281,10 +265,6 @@ TEXTOS = {
     },
     "error_generico": {"es": "❌ Error: {error}", "en": "❌ Error: {error}", "fr": "❌ Erreur : {error}", "de": "❌ Fehler: {error}", "zh": "❌ 错误：{error}"},
 
-    # ---------------------------------------------------------------
-    # Mensajes de validación de calculadoras_clinicas.py — antes fijos
-    # en español sin importar el idioma de la UI.
-    # ---------------------------------------------------------------
     "err_peso_altura_numeros": {
         "es": "Peso y altura deben ser números.", "en": "Weight and height must be numbers.", "fr": "Le poids et la taille doivent être des nombres.",
         "de": "Gewicht und Größe müssen Zahlen sein.", "zh": "体重和身高必须为数字。",
@@ -355,9 +335,6 @@ TEXTOS = {
         "zh": "未找到适用于该清除率的剂量区间。",
     },
 
-    # ---------------------------------------------------------------
-    # limite_uso.py — mensaje de límite de solicitudes alcanzado
-    # ---------------------------------------------------------------
     "limite_alcanzado": {
         "es": "Alcanzaste el límite de {maximo} solicitudes de '{tipo}' por {etiqueta}. Espera un momento antes de volver a intentarlo — este límite protege la cuota compartida de la IA para todos los usuarios.",
         "en": "You've reached the limit of {maximo} '{tipo}' requests per {etiqueta}. Wait a moment before trying again — this limit protects the shared AI quota for all users.",
@@ -369,9 +346,6 @@ TEXTOS = {
     "ventana_hora": {"es": "hora", "en": "hour", "fr": "heure", "de": "Stunde", "zh": "小时"},
     "ventana_dia": {"es": "día", "en": "day", "fr": "jour", "de": "Tag", "zh": "天"},
 
-    # ---------------------------------------------------------------
-    # interacciones_farmacologicas.py — respaldo de IA
-    # ---------------------------------------------------------------
     "groq_no_configurado": {
         "es": "El cliente de Groq no está configurado (falta GROQ_API_KEY).",
         "en": "The Groq client is not configured (GROQ_API_KEY is missing).",
@@ -396,9 +370,6 @@ TEXTOS = {
     },
     "consulta_medica_default": {"es": "Consulta Médica", "en": "Medical Query", "fr": "Consultation Médicale", "de": "Medizinische Anfrage", "zh": "医学咨询"},
 
-    # ---------------------------------------------------------------
-    # Calculadoras clínicas
-    # ---------------------------------------------------------------
     "calc_titulo_vista": {"es": "🧮 Calculadoras clínicas", "en": "🧮 Clinical calculators", "fr": "🧮 Calculatrices cliniques", "de": "🧮 Klinische Rechner", "zh": "🧮 临床计算器"},
     "calc_disclaimer": {
         "es": "Herramientas de apoyo al estudio — no sustituyen la validación clínica de un médico o farmacéutico.",
@@ -544,9 +515,6 @@ TEXTOS = {
     "efecto": {"es": "Efecto: {v}", "en": "Effect: {v}", "fr": "Effet : {v}", "de": "Wirkung: {v}", "zh": "效应：{v}"},
     "recomendacion": {"es": "Recomendación: {v}", "en": "Recommendation: {v}", "fr": "Recommandation : {v}", "de": "Empfehlung: {v}", "zh": "建议：{v}"},
 
-    # ---------------------------------------------------------------
-    # Examen
-    # ---------------------------------------------------------------
     "examen_terminado": {"es": "🎓 Examen terminado", "en": "🎓 Exam finished", "fr": "🎓 Examen terminé", "de": "🎓 Prüfung beendet", "zh": "🎓 考试已结束"},
     "aciertos_de": {"es": "Aciertos: {a} de {t}", "en": "Correct: {a} of {t}", "fr": "Bonnes réponses : {a} sur {t}", "de": "Richtig: {a} von {t}", "zh": "正确：{a} / {t}"},
     "pregunta_de": {"es": "Pregunta {n} de {t}", "en": "Question {n} of {t}", "fr": "Question {n} sur {t}", "de": "Frage {n} von {t}", "zh": "第 {n} 题，共 {t} 题"},
@@ -571,9 +539,6 @@ TEXTOS = {
     "tus_documentos": {"es": "Tus documentos", "en": "Your documents", "fr": "Tes documents", "de": "Deine Dokumente", "zh": "你的文档"},
     "conocimiento_general": {"es": "Conocimiento general", "en": "General knowledge", "fr": "Connaissances générales", "de": "Allgemeinwissen", "zh": "通用知识"},
 
-    # ---------------------------------------------------------------
-    # Flashcards / repaso
-    # ---------------------------------------------------------------
     "repaso_terminado": {"es": "🎉 Terminaste el repaso de hoy.", "en": "🎉 You finished today's review.", "fr": "🎉 Tu as terminé la révision du jour.", "de": "🎉 Du hast die heutige Wiederholung beendet.", "zh": "🎉 你已完成今天的复习。"},
     "sin_flashcards_pendientes": {
         "es": "🎉 No tienes flashcards pendientes por hoy.",
@@ -609,9 +574,6 @@ TEXTOS = {
         "zh": "🧠 这与你之前学过的内容有关：{temas}",
     },
 
-    # ---------------------------------------------------------------
-    # Progreso
-    # ---------------------------------------------------------------
     "progreso_titulo": {"es": "📊 Tu progreso de estudio", "en": "📊 Your study progress", "fr": "📊 Ta progression d'étude", "de": "📊 Dein Lernfortschritt", "zh": "📊 你的学习进度"},
     "temas_estudiados": {"es": "{n} temas estudiados", "en": "{n} topics studied", "fr": "{n} sujets étudiés", "de": "{n} gelernte Themen", "zh": "已学习 {n} 个主题"},
     "n_flashcards": {"es": "{n} flashcards", "en": "{n} flashcards", "fr": "{n} cartes mémo", "de": "{n} Karteikarten", "zh": "{n} 张记忆卡"},
@@ -640,12 +602,6 @@ TEXTOS = {
     "nivel_dominado": {"es": "Dominado", "en": "Mastered", "fr": "Maîtrisé", "de": "Beherrscht", "zh": "已掌握"},
     "nivel_pocos_datos": {"es": "Muy pocos datos aún", "en": "Not enough data yet", "fr": "Pas encore assez de données", "de": "Noch zu wenige Daten", "zh": "数据还太少"},
 
-    # ---------------------------------------------------------------
-    # Categorías clínicas devueltas por calculadoras_clinicas.py — son
-    # un vocabulario fijo y pequeño (a diferencia de la base de
-    # interacciones, que es texto libre extenso), así que sí vale la
-    # pena traducirlas aquí en vez de dejarlas siempre en español.
-    # ---------------------------------------------------------------
     "cat_bajo_peso": {"es": "Bajo peso", "en": "Underweight", "fr": "Insuffisance pondérale", "de": "Untergewicht", "zh": "体重过轻"},
     "cat_peso_normal": {"es": "Peso normal", "en": "Normal weight", "fr": "Poids normal", "de": "Normalgewicht", "zh": "体重正常"},
     "cat_sobrepeso": {"es": "Sobrepeso", "en": "Overweight", "fr": "Surpoids", "de": "Übergewicht", "zh": "超重"},
@@ -666,10 +622,6 @@ TEXTOS = {
 }
 
 
-# Traduce una categoría clínica devuelta por calculadoras_clinicas.py
-# (siempre viene en español desde ese módulo — es más simple traducir
-# aquí, en un solo lugar, que duplicar la lógica de clasificación en 5
-# idiomas dentro de cada función de cálculo).
 _MAPA_CATEGORIAS = {
     "Bajo peso": "cat_bajo_peso", "Peso normal": "cat_peso_normal", "Sobrepeso": "cat_sobrepeso",
     "Obesidad grado I": "cat_obesidad_1", "Obesidad grado II": "cat_obesidad_2", "Obesidad grado III": "cat_obesidad_3",
@@ -679,7 +631,6 @@ _MAPA_CATEGORIAS = {
     "G1 (normal o alta)": "cat_ckd_g1", "G2 (levemente disminuida)": "cat_ckd_g2",
     "G3a (leve a moderadamente disminuida)": "cat_ckd_g3a", "G3b (moderada a gravemente disminuida)": "cat_ckd_g3b",
     "G4 (gravemente disminuida)": "cat_ckd_g4", "G5 (fallo renal)": "cat_ckd_g5",
-    # Niveles de jerarquía de evidencia (pubmed_search.py: _ORDEN_JERARQUIA_EVIDENCIA)
     "Revisión (meta-análisis)": "niv_meta_analisis",
     "Revisión (sistemática)": "niv_revision_sistematica",
     "Guía clínica": "niv_guia_clinica",
