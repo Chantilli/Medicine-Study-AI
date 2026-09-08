@@ -130,9 +130,6 @@ def inicializar_db():
     if "tipos_publicacion" not in columnas_papers:
         cursor.execute("ALTER TABLE papers ADD COLUMN tipos_publicacion TEXT")
 
-    # -----------------------------------------------------------------
-    # Fase 6 (seguridad): límite de uso por usuario + auditoría de uso.
-    # -----------------------------------------------------------------
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS solicitudes_uso (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -161,13 +158,6 @@ def inicializar_db():
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_usuario_fecha ON auditoria_uso(usuario_id, fecha)")
 
-    # -----------------------------------------------------------------
-    # Fase 11: feedback de respuestas (👍/👎) — a diferencia de
-    # auditoria_uso, aquí SÍ se guarda el texto completo de pregunta y
-    # respuesta a propósito: es un dataset de casos para que el
-    # desarrollador revise patrones de error, no telemetría anónima.
-    # Solo se llena cuando el estudiante toca 👍/👎 explícitamente.
-    # -----------------------------------------------------------------
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS feedback_respuestas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -272,5 +262,3 @@ def eliminar_chat_db(chat_id, usuario_id):
     conn.close()
 
 inicializar_db()
-
-# =====================================================================
