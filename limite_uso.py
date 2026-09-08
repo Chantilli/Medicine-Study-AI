@@ -25,7 +25,6 @@ from datetime import datetime, timedelta
 from database import DB_PATH
 from traducciones import t
 
-# (máx. solicitudes, ventana en segundos) por tipo de operación.
 LIMITES = {
     "chat": [(8, 60), (60, 3600), (300, 86400)],
     "pubmed": [(4, 60), (30, 3600), (100, 86400)],
@@ -34,8 +33,6 @@ LIMITES = {
     "icd11": [(4, 60), (30, 3600), (100, 86400)],
 }
 
-# Cada cuántas verificaciones se hace limpieza de filas viejas (barato,
-# pero no hace falta hacerlo en cada llamada).
 _INTERVALO_LIMPIEZA = 50
 _contador_llamadas = {"n": 0}
 
