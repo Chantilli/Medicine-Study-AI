@@ -60,5 +60,3 @@ def generar_titulo_con_ia(user_msg: str, idioma: str = "es") -> str:
         return response.choices[0].message.content.strip()
     except Exception:
         return titulo_por_defecto
-
-# =====================================================================
