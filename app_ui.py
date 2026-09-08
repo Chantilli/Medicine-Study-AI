@@ -94,27 +94,6 @@ def main(page: ft.Page):
     lista_historial_ui = ft.Column(spacing=5, scroll=ft.ScrollMode.AUTO)
     txt_estado_pdf = ft.Text("", size=12, color="#22c55e", italic=True)
 
-    # =====================================================================
-    # Sistema de renderizado del chat (Fase 7 — UI/UX)
-    #
-    # Antes, cada mensaje se mandaba como ft.Text plano — por eso el
-    # markdown que devuelve el modelo (negritas **así**, tablas |a|b|,
-    # encabezados ##) se veía crudo, con los símbolos literales. Ahora:
-    #
-    #   - Los mensajes del ASISTENTE se renderizan con ft.Markdown real
-    #     (negritas, tablas, encabezados, listas se ven formateados).
-    #   - Todo el texto es seleccionable (selectable=True) para copiar.
-    #   - Cada respuesta del asistente trae un botón de copiar.
-    #   - Cada mensaje del usuario trae un botón de editar: reescribe el
-    #     mensaje, descarta esa pregunta y todo lo posterior, y lo deja
-    #     listo en el cuadro de texto para reenviar corregido.
-    #   - Los pasos intermedios ("buscando en PubMed...", "generando...",
-    #     "verificando...") ya NO se imprimen sueltos en el chat — se
-    #     acumulan en un panel plegable "⚙️ Ver proceso" (colapsado por
-    #     defecto, igual que el razonamiento colapsado de Claude/Grok),
-    #     dejando visible solo la respuesta final y las alertas que sí
-    #     importan (citas inventadas, inconsistencias, emergencias).
-    # =====================================================================
 
     def _tarjeta_aviso(contenido, tipo="info"):
         """Tarjeta de aviso reutilizable — reemplaza los Container(...)
@@ -373,10 +352,6 @@ def main(page: ft.Page):
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=8)
             )
         except Exception as ex:
-            # Nunca dejar la pantalla en blanco en silencio: si algo de la
-            # pantalla de bienvenida falla, se ve el error y queda en el
-            # log del servidor (Logs de HF) en vez de un panel vacío sin
-            # ninguna pista de qué pasó.
             print(f"[mostrar_pantalla_bienvenida] Error: {ex}")
             chat_view.controls.clear()
             chat_view.controls.append(
@@ -400,13 +375,6 @@ def main(page: ft.Page):
         modo_evidencia_var[0] = e.control.value
 
     def cambiar_idioma(e):
-        # idioma_var[0] se lee en vivo en cada turno para las respuestas de
-        # la IA (mensajes_para_groq[0] = construir_system_prompt(...)), y
-        # aquí además se retraduce todo lo que está siempre visible
-        # (sidebar) y se refresca la pantalla actual a la nueva pantalla
-        # de bienvenida ya traducida — antes el botón solo cambiaba el
-        # idioma de las respuestas del chat, dejando calculadoras, examen
-        # y el resto del sidebar en español sin importar la selección.
         idioma_var[0] = e.control.value
         aplicar_idioma_ui(idioma_var[0])
         chat_view.controls.clear()
@@ -459,11 +427,6 @@ def main(page: ft.Page):
             texto_extraido = resultado_extraccion["texto"]
             tipo_texto = "ocr" if resultado_extraccion["via_ocr"] else "normal"
 
-            # Filtro de seguridad: un PDF podría traer texto oculto intentando
-            # manipular las instrucciones del sistema una vez indexado como
-            # fragmento [Fn]. Se redactan las líneas sospechosas ANTES de
-            # fragmentar/indexar (el SYSTEM_PROMPT en config.py es la segunda
-            # capa de defensa, por si algo se escapa de este filtro).
             texto_extraido, alertas_inyeccion = sanitizar_texto_pdf(texto_extraido)
             if alertas_inyeccion:
                 chat_view.controls.append(
@@ -637,7 +600,6 @@ def main(page: ft.Page):
     def _enviar_mensaje_interno(texto):
         nonlocal historial
 
-        # 🚦 Límite de uso: se revisa ANTES de gastar cuota de Groq/PubMed.
         limite_chat = verificar_limite(usuario_actual_id[0], "chat", idioma=idioma_var[0])
         if not limite_chat["permitido"]:
             if len(historial) == 1:
@@ -655,8 +617,6 @@ def main(page: ft.Page):
         chat_view.controls.append(_burbuja_usuario(texto, indice_historial=len(historial)))
         page.update()
 
-        # 🚨 Clasificación de riesgo clínico: herramienta EDUCATIVA, no un
-        # servicio de manejo de emergencias ni de consejo médico personal.
         clasificacion = clasificar_consulta(texto)
         if clasificacion["categoria"] == "emergencia":
             texto_mensaje_emergencia = (
@@ -679,9 +639,6 @@ def main(page: ft.Page):
             page.update()
             sufijo_riesgo_personal = instruccion_refuerzo_riesgo_personal(idioma_var[0])
 
-        # Panel plegable de "proceso" — colapsado por defecto. Aquí van los
-        # pasos intermedios (búsqueda en PubMed, generación, verificación)
-        # en vez de imprimirse sueltos y permanentes en el chat.
         panel_proceso, columna_pasos = _crear_panel_proceso()
         chat_view.controls.append(panel_proceso)
         page.update()
@@ -741,11 +698,6 @@ def main(page: ft.Page):
                     )
                     page.update()
 
-                # 🔤 Glosario ICD-11: solo si el idioma NO es inglés (PubMed ya
-                # está en inglés, no hace falta terminología oficial extra) y
-                # solo si no se pasó el límite de uso — un fallo aquí nunca
-                # debe frenar la respuesta principal, así que va todo envuelto
-                # y con su propio try/except silencioso.
                 bloque_icd11 = ""
                 if idioma_var[0] != "en":
                     limite_icd11 = verificar_limite(usuario_actual_id[0], "icd11", idioma=idioma_var[0])
@@ -770,11 +722,6 @@ def main(page: ft.Page):
                 historial.append({"role": "user", "content": f"{bloque_total_contexto}\nPregunta: {texto}{sufijo_riesgo_personal}"})
                 historial = recortar_historial(historial)
                 mensajes_para_groq = [{"role": m["role"], "content": m["content"]} for m in historial]
-                # El idioma puede haberse cambiado a mitad de conversación —
-                # se sobreescribe el mensaje de sistema con el idioma ACTUAL
-                # en vez de usar el que se guardó cuando se creó el chat, así
-                # el cambio de idioma aplica desde el siguiente mensaje sin
-                # necesidad de abrir un chat nuevo.
                 mensajes_para_groq[0] = construir_system_prompt(idioma_var[0])
 
                 fila_generando = _agregar_paso_proceso(columna_pasos, t("generando_respuesta", idioma_var[0]))
@@ -796,9 +743,6 @@ def main(page: ft.Page):
                         full_response += delta
                         ai_markdown.value = full_response
                         _contador_chunks += 1
-                        # Actualizar la UI cada pocos fragmentos (no en cada
-                        # token) — se ve igual de "vivo" pero sin recargar
-                        # de renders el Markdown en cada carácter.
                         if _contador_chunks % 3 == 0 or "\n" in delta:
                             page.update()
                 ai_markdown.value = full_response
@@ -1283,7 +1227,6 @@ def main(page: ft.Page):
 
         chat_view.controls.clear()
 
-        # --- IMC ---
         campo_peso_imc = ft.TextField(label=t("campo_peso", idioma), width=140, border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0")
         campo_altura_imc = ft.TextField(label=t("campo_altura", idioma), width=140, border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0")
         caja_imc = _caja_resultado_calculadora()
@@ -1314,7 +1257,6 @@ def main(page: ft.Page):
             )],
         )
 
-        # --- Superficie corporal (BSA) ---
         campo_peso_bsa = ft.TextField(label=t("campo_peso", idioma), width=140, border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0")
         campo_altura_bsa = ft.TextField(label=t("campo_altura", idioma), width=140, border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0")
         dropdown_formula_bsa = ft.Dropdown(
@@ -1346,7 +1288,6 @@ def main(page: ft.Page):
             )],
         )
 
-        # --- Función renal (Cockcroft-Gault + CKD-EPI) ---
         campo_edad_renal = ft.TextField(label=t("campo_edad", idioma), width=110, border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0")
         campo_peso_renal = ft.TextField(label=t("campo_peso", idioma), width=110, border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0")
         campo_altura_renal = ft.TextField(label=t("campo_altura_opcional", idioma), width=170, border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0")
@@ -1394,7 +1335,6 @@ def main(page: ft.Page):
             )],
         )
 
-        # --- Dosis por peso ---
         campo_peso_dosis = ft.TextField(label=t("campo_peso", idioma), width=120, border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0")
         campo_mgkg_dosis = ft.TextField(label=t("campo_mgkg", idioma), width=100, border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0")
         campo_max_dosis = ft.TextField(label=t("campo_dosis_max", idioma), width=180, border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0")
@@ -1434,7 +1374,6 @@ def main(page: ft.Page):
             )],
         )
 
-        # --- Ajuste de dosis por función renal (tabla de referencia) ---
         campo_farmaco_ajuste = ft.TextField(label=t("campo_farmaco", idioma), width=180, border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0")
         campo_crcl_ajuste = ft.TextField(label=t("campo_aclaramiento", idioma), width=180, border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0")
         caja_ajuste = _caja_resultado_calculadora()
@@ -1475,7 +1414,6 @@ def main(page: ft.Page):
             )],
         )
 
-        # --- Interacciones farmacológicas ---
         campo_farmacos_interaccion = ft.TextField(
             label=t("campo_farmacos_lista", idioma), multiline=True, min_lines=3, max_lines=6,
             border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0",
@@ -1761,9 +1699,6 @@ def main(page: ft.Page):
             ], expand=True)
         )
         page.update()
-        # Cada paso posterior va envuelto por separado: si uno falla, los
-        # demás igual se ejecutan y queda evidencia en el log del servidor
-        # en vez de dejar la app a medio cargar sin ninguna pista.
         try:
             actualizar_sidebar_historial()
         except Exception as ex:
