@@ -43,9 +43,6 @@ def _normalizar(texto: str) -> str:
     return "".join(c for c in texto if not unicodedata.combining(c))
 
 
-# ---------------------------------------------------------------------
-# IMC
-# ---------------------------------------------------------------------
 
 def calcular_imc(peso_kg, altura_cm, idioma: str = "es") -> dict:
     """
@@ -79,9 +76,6 @@ def calcular_imc(peso_kg, altura_cm, idioma: str = "es") -> dict:
     return {"valor": round(imc, 1), "categoria": categoria}
 
 
-# ---------------------------------------------------------------------
-# Superficie corporal (BSA)
-# ---------------------------------------------------------------------
 
 def calcular_superficie_corporal(peso_kg, altura_cm, formula: str = "mosteller", idioma: str = "es") -> dict:
     """
@@ -107,10 +101,6 @@ def calcular_superficie_corporal(peso_kg, altura_cm, formula: str = "mosteller",
     return {"valor": round(bsa, 2), "formula": nombre_formula}
 
 
-# ---------------------------------------------------------------------
-# Función renal: Cockcroft-Gault (para ajustar dosis) y CKD-EPI 2021
-# (para estadificar la TFG, sin coeficiente racial)
-# ---------------------------------------------------------------------
 
 def calcular_peso_ajustado(peso_kg: float, altura_cm: float, sexo: str) -> float:
     """
@@ -231,9 +221,6 @@ def calcular_egfr_ckd_epi(edad, creatinina_mg_dl, sexo, idioma: str = "es") -> d
     return {"valor_ml_min_173": round(egfr, 1), "etapa": etapa, "formula": "CKD-EPI 2021"}
 
 
-# ---------------------------------------------------------------------
-# Dosis por peso
-# ---------------------------------------------------------------------
 
 def calcular_dosis_por_peso(peso_kg, mg_por_kg, dosis_max_mg=None,
                               dosis_min_mg=None, tomas_por_dia=None, idioma: str = "es") -> dict:
@@ -288,15 +275,6 @@ def calcular_dosis_por_peso(peso_kg, mg_por_kg, dosis_max_mg=None,
     return resultado
 
 
-# ---------------------------------------------------------------------
-# Ajuste de dosis por función renal — tabla de referencia curada
-# ---------------------------------------------------------------------
-# Estructura: nombre del fármaco -> lista de bandas (crcl_min, crcl_max,
-# instrucción). Cada banda cubre [crcl_min, crcl_max). Es una referencia
-# EDUCATIVA de bandas ampliamente citadas (fichas técnicas / guías tipo
-# Sanford) para fármacos comunes en el estudio de medicina — NO
-# reemplaza la ficha técnica vigente ni el criterio de farmacia clínica
-# para un paciente real.
 
 AJUSTES_RENALES_COMUNES = {
     "vancomicina": [
