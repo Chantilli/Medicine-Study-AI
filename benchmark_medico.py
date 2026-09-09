@@ -37,11 +37,6 @@ import time
 
 from config import client, MODELO_CHAT
 
-# ---------------------------------------------------------------------
-# Banco de preguntas — originales, estilo ENARM/USMLE Step 2, cubriendo
-# varias especialidades. Cada una: viñeta + 4 opciones + índice (0-3)
-# de la respuesta correcta + una explicación breve para cuando falla.
-# ---------------------------------------------------------------------
 PREGUNTAS = [
     {
         "especialidad": "Cardiología",
@@ -347,7 +342,7 @@ def correr_benchmark():
 
         marca = "✅" if acierto else ("❔" if indice_elegido is None else "❌")
         print(f"{marca} [{i:02d}/{len(PREGUNTAS)}] {p['especialidad']}")
-        time.sleep(0.3)  # cortesía con el rate limit de Groq, no hace falta ir a máxima velocidad
+        time.sleep(0.3)
 
     print()
     print("=" * 70)
