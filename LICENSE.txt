@@ -1,0 +1,88 @@
+LICENCIA DE USO RESTRINGIDO — Medicine Study AI
+
+Copyright © 2026 Santiago Briones Yáñez. Todos los derechos reservados.
+
+Este software y su código fuente ("el Proyecto") son propiedad exclusiva
+del autor mencionado arriba. Salvo lo indicado explícitamente en la
+sección "Uso permitido" de este documento, NINGÚN derecho sobre el
+Proyecto se concede a terceros.
+
+────────────────────────────────────────────────────────────────────
+1. USO PERMITIDO
+────────────────────────────────────────────────────────────────────
+
+Cualquier persona puede:
+
+  a) Acceder y usar la instancia públicamente desplegada del Proyecto
+     (la aplicación tal como corre en su Space de Hugging Face) para
+     fines personales, educativos y no comerciales — por ejemplo, como
+     estudiante usándola para estudiar medicina.
+
+  b) Leer el código fuente cuando esté visible públicamente, con el
+     único propósito de evaluarlo (por ejemplo, revisores de un
+     portafolio, reclutadores, o profesores).
+
+Ninguno de estos usos implica ni transfiere ningún otro derecho sobre
+el Proyecto.
+
+────────────────────────────────────────────────────────────────────
+2. USO PROHIBIDO
+────────────────────────────────────────────────────────────────────
+
+Queda expresamente PROHIBIDO, sin autorización previa y por escrito
+del autor:
+
+  a) Copiar, clonar, descargar o reproducir el código fuente con fines
+     distintos a la evaluación personal descrita en la sección 1.
+
+  b) Redistribuir el Proyecto, en todo o en parte, modificado o sin
+     modificar, por cualquier medio (repositorios públicos, paquetes,
+     otros Spaces, sitios propios, etc.).
+
+  c) Presentar el Proyecto, en todo o en parte, como obra propia o de
+     un tercero distinto al autor original — incluyendo eliminar o
+     alterar los avisos de autoría, o publicarlo bajo otro nombre.
+
+  d) Usar el Proyecto, en todo o en parte, con fines comerciales:
+     venderlo, cobrar por su acceso, ofrecerlo como parte de un
+     servicio de pago, o monetizarlo de cualquier forma.
+
+  e) Crear obras derivadas (versiones modificadas, forks, extensiones)
+     destinadas a distribución, publicación o uso fuera del entorno
+     personal de quien las cree.
+
+  f) Sublicenciar, ceder o transferir cualquiera de los usos permitidos
+     en la sección 1 a un tercero.
+
+El incumplimiento de cualquiera de estos puntos constituye una
+violación de derechos de autor y podrá dar lugar a las acciones legales
+correspondientes, incluyendo solicitudes de retiro de contenido (DMCA
+u homólogas) ante la plataforma donde se aloje el uso no autorizado.
+
+────────────────────────────────────────────────────────────────────
+3. NATURALEZA EDUCATIVA — SIN GARANTÍA MÉDICA
+────────────────────────────────────────────────────────────────────
+
+Medicine Study AI es una herramienta EDUCATIVA de apoyo al estudio.
+NO constituye consejo médico, diagnóstico ni tratamiento, y no debe
+usarse como sustituto del criterio de un profesional de la salud. El
+autor no asume responsabilidad por decisiones clínicas tomadas con
+base en el contenido generado por esta herramienta.
+
+────────────────────────────────────────────────────────────────────
+4. SIN GARANTÍA
+────────────────────────────────────────────────────────────────────
+
+EL PROYECTO SE PROPORCIONA "TAL CUAL", SIN GARANTÍA DE NINGÚN TIPO,
+EXPRESA O IMPLÍCITA, INCLUYENDO PERO NO LIMITADA A GARANTÍAS DE
+COMERCIABILIDAD, IDONEIDAD PARA UN PROPÓSITO PARTICULAR, O NO
+INFRACCIÓN. EN NINGÚN CASO EL AUTOR SERÁ RESPONSABLE POR NINGÚN
+RECLAMO, DAÑO U OTRA RESPONSABILIDAD DERIVADA DEL USO DEL PROYECTO.
+
+────────────────────────────────────────────────────────────────────
+5. PERMISOS ADICIONALES
+────────────────────────────────────────────────────────────────────
+
+Para solicitar un uso distinto a los permitidos en la sección 1
+(por ejemplo, colaboración, uso académico institucional, o licencia
+comercial), contactar directamente al autor.
