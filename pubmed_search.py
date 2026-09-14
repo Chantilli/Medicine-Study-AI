@@ -136,6 +136,33 @@ def parsear_articulo_pubmed(articulo):
     }
 
 
+
+ESTADO_BUSQUEDA_OK = "ok"
+ESTADO_BUSQUEDA_ZERO_RESULTS = "zero_results"
+ESTADO_BUSQUEDA_PARTIAL_PROVIDER_FAILURE = "partial_provider_failure"
+ESTADO_BUSQUEDA_PROVIDER_ERROR = "provider_error"
+
+
+def _calcular_estado_busqueda(proveedores: dict, hay_papers: bool) -> dict:
+    """
+    Reduce el estado por-proveedor (ok/error) a un único estado global.
+    Ver los cuatro ESTADO_BUSQUEDA_* de arriba. 'proveedores' es un dict
+    tipo {"pubmed": "ok", "europepmc": "error", "semantic_scholar": "ok"}.
+    """
+    valores = list(proveedores.values())
+    n_ok = sum(1 for v in valores if v == "ok")
+    n_total = len(valores)
+    if n_total == 0 or n_ok == 0:
+        estado = ESTADO_BUSQUEDA_PROVIDER_ERROR
+    elif n_ok < n_total:
+        estado = ESTADO_BUSQUEDA_PARTIAL_PROVIDER_FAILURE
+    elif not hay_papers:
+        estado = ESTADO_BUSQUEDA_ZERO_RESULTS
+    else:
+        estado = ESTADO_BUSQUEDA_OK
+    return {"estado": estado, "proveedores": dict(proveedores)}
+
+
 _lock_pubmed = threading.Lock()
 _tiempo_ultima_llamada_pubmed = [0.0]
 
@@ -484,7 +511,8 @@ def buscar_pubmed_estructurado(consulta, usuario_id):
       fuente (misma query, suma preprints y amplía cobertura) → parsear →
       ranking semántico → guardado con dedup.
 
-    Devuelve (papers_relevantes, n_nuevos, total_unicos):
+    Devuelve (papers_relevantes, n_nuevos, total_unicos, intentos_debug,
+    estado_busqueda):
       - papers_relevantes: TODO el ranking de esta búsqueda (nuevos +
         papers ya conocidos de búsquedas anteriores, de ambas fuentes).
         Es lo que se usa para el contexto del modelo — la dedup evita
@@ -493,19 +521,31 @@ def buscar_pubmed_estructurado(consulta, usuario_id):
       - n_nuevos: cuántos de esos papers se insertaron por primera vez
         (solo para el badge visual).
       - total_unicos: total de papers acumulados del usuario.
+      - estado_busqueda: {"estado": uno de los ESTADO_BUSQUEDA_*,
+        "proveedores": {"pubmed": "ok"|"error", "europepmc": ...,
+        "semantic_scholar": ...}}. Ver el comentario junto a
+        ESTADO_BUSQUEDA_OK más arriba — "cero resultados" y "el
+        proveedor falló" son estados distintos aunque ambos dejen
+        papers_relevantes en [].
 
     Los errores de red/XML nunca rompen el flujo: se devuelven listas
-    vacías y la app sigue con la pregunta.
+    vacías y la app sigue con la pregunta, pero ahora queda explícito
+    en estado_busqueda que fue por una falla, no por ausencia genuina
+    de literatura.
     """
     try:
         variantes = reescribir_queries_pubmed(consulta)
         id_list = []
         query_usada = None
         intentos_debug = []
+        pubmed_llamadas_ok = 0
+        pubmed_llamadas_error = 0
         for variante in variantes:
             try:
                 resultado = _esearch_pubmed(variante)
+                pubmed_llamadas_ok += 1
             except Exception as ex:
+                pubmed_llamadas_error += 1
                 intentos_debug.append(f"'{variante}' → error de red: {ex}")
                 continue
             intentos_debug.append(f"'{variante}' → {len(resultado)} resultados")
@@ -513,6 +553,7 @@ def buscar_pubmed_estructurado(consulta, usuario_id):
                 id_list = resultado
                 query_usada = variante
                 break
+        estado_pubmed = "ok" if pubmed_llamadas_ok > 0 else "error"
         papers = []
         if id_list:
             _throttle_pubmed()
@@ -535,33 +576,50 @@ def buscar_pubmed_estructurado(consulta, usuario_id):
         pmids_vistos = {p["pmid"] for p in papers if p.get("pmid")}
         dois_vistos = {p["doi"] for p in papers if p.get("doi")}
 
-        papers_epmc = buscar_europepmc(query_otras_fuentes)
+        papers_epmc, epmc_ok = buscar_europepmc(query_otras_fuentes)
         n_epmc_nuevos = _fusionar_sin_duplicados(papers, papers_epmc, pmids_vistos, dois_vistos)
         if papers_epmc:
             intentos_debug.append(
                 f"Europe PMC ('{query_otras_fuentes}') → {len(papers_epmc)} resultados, "
                 f"{n_epmc_nuevos} no duplicados"
             )
+        elif not epmc_ok:
+            intentos_debug.append(f"Europe PMC ('{query_otras_fuentes}') → error de proveedor")
 
-        papers_s2 = buscar_semantic_scholar(query_otras_fuentes)
+        papers_s2, s2_ok = buscar_semantic_scholar(query_otras_fuentes)
         n_s2_nuevos = _fusionar_sin_duplicados(papers, papers_s2, pmids_vistos, dois_vistos)
         if papers_s2:
             intentos_debug.append(
                 f"Semantic Scholar ('{query_otras_fuentes}') → {len(papers_s2)} resultados, "
                 f"{n_s2_nuevos} no duplicados"
             )
+        elif not s2_ok:
+            intentos_debug.append(f"Semantic Scholar ('{query_otras_fuentes}') → error de proveedor")
+
+        proveedores = {"pubmed": estado_pubmed, "europepmc": "ok" if epmc_ok else "error",
+                       "semantic_scholar": "ok" if s2_ok else "error"}
 
         if not papers:
-            return [], 0, contar_papers_usuario(usuario_id), intentos_debug
+            estado_busqueda = _calcular_estado_busqueda(proveedores, hay_papers=False)
+            return [], 0, contar_papers_usuario(usuario_id), intentos_debug, estado_busqueda
 
         
         papers_rankeados = ranking_semantico(consulta, papers)
         nuevos, total_unicos = guardar_papers(usuario_id, papers_rankeados)
         intentos_debug.append(f"usada: '{query_usada}'")
-        return papers_rankeados, len(nuevos), total_unicos, intentos_debug
+        estado_busqueda = _calcular_estado_busqueda(proveedores, hay_papers=True)
+        return papers_rankeados, len(nuevos), total_unicos, intentos_debug, estado_busqueda
 
     except (urllib.error.URLError, ET.ParseError, TimeoutError, ValueError, OSError, sqlite3.Error) as ex:
-        return [], 0, contar_papers_usuario(usuario_id), [f"error: {ex}"]
+        # Este catch cubre fallas fuera del bucle por-variante de arriba
+        # (ej. efetch de PubMed o la base de datos), así que aquí no hay
+        # forma de saber si Europe PMC/Semantic Scholar habrían
+        # funcionado — se reporta como falla total del proveedor.
+        estado_busqueda = {
+            "estado": ESTADO_BUSQUEDA_PROVIDER_ERROR,
+            "proveedores": {"pubmed": "error", "europepmc": "error", "semantic_scholar": "error"},
+        }
+        return [], 0, contar_papers_usuario(usuario_id), [f"error: {ex}"], estado_busqueda
 
 
 EUROPEPMC_BASE = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
@@ -641,12 +699,17 @@ def parsear_resultado_europepmc(item: dict):
         "fuente_bd": "Europe PMC",
     }
 
-def buscar_europepmc(query: str, retmax: int = 10) -> list:
+def buscar_europepmc(query: str, retmax: int = 10) -> tuple:
     """
     Busca en Europe PMC (MEDLINE + PMC + preprints de bioRxiv/medRxiv).
-    No requiere API key. Nunca lanza excepción: si falla la red, devuelve
-    lista vacía y el resto del flujo de búsqueda sigue con lo que ya
-    tenía de PubMed.
+    No requiere API key. Nunca lanza excepción hacia afuera: si falla la
+    red, devuelve lista vacía y el resto del flujo de búsqueda sigue con
+    lo que ya tenía de PubMed.
+
+    Devuelve (papers, ok): 'ok' es False solo cuando el proveedor
+    genuinamente falló (red/timeout/JSON inválido), no cuando la
+    búsqueda funcionó y simplemente no encontró nada — esa distinción es
+    la que consume _calcular_estado_busqueda() más arriba.
     """
     try:
         query_encoded = urllib.parse.quote_plus(query)
@@ -663,9 +726,9 @@ def buscar_europepmc(query: str, retmax: int = 10) -> list:
             p = parsear_resultado_europepmc(item)
             if p:
                 papers.append(p)
-        return papers
+        return papers, True
     except (urllib.error.URLError, TimeoutError, ValueError, OSError):
-        return []
+        return [], False
 
 
 
@@ -743,12 +806,17 @@ def parsear_resultado_semantic_scholar(item: dict):
     }
 
 
-def buscar_semantic_scholar(query: str, limit: int = 10) -> list:
+def buscar_semantic_scholar(query: str, limit: int = 10) -> tuple:
     """
     Busca en Semantic Scholar. No requiere API key. Nunca lanza
-    excepción: si falla la red o se topa con el límite de tasa público
-    (HTTPError, subclase de URLError), devuelve lista vacía y el resto
-    del flujo de búsqueda sigue con lo que ya tenía de PubMed/Europe PMC.
+    excepción hacia afuera: si falla la red o se topa con el límite de
+    tasa público (HTTPError, subclase de URLError), devuelve lista
+    vacía y el resto del flujo de búsqueda sigue con lo que ya tenía de
+    PubMed/Europe PMC.
+
+    Devuelve (papers, ok) — mismo contrato que buscar_europepmc(): 'ok'
+    distingue "el proveedor falló" de "el proveedor funcionó y no
+    encontró nada".
     """
     try:
         query_encoded = urllib.parse.quote_plus(query)
@@ -763,6 +831,6 @@ def buscar_semantic_scholar(query: str, limit: int = 10) -> list:
             p = parsear_resultado_semantic_scholar(item)
             if p:
                 papers.append(p)
-        return papers
+        return papers, True
     except (urllib.error.URLError, TimeoutError, ValueError, OSError):
-        return []
+        return [], False
