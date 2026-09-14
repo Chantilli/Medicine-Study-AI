@@ -16,7 +16,10 @@ from database import (
 from rag_embeddings import guardar_fragmentos_pdf, buscar_fragmentos_relevantes
 from ocr_pdf import extraer_texto_pdf_con_ocr, _disponible_ocr
 from extraccion_tablas import extraer_tablas_pdf
-from pubmed_search import buscar_pubmed_estructurado, filtrar_papers_por_evidencia, MODOS_EVIDENCIA
+from pubmed_search import (
+    buscar_pubmed_estructurado, filtrar_papers_por_evidencia, MODOS_EVIDENCIA,
+    ESTADO_BUSQUEDA_PROVIDER_ERROR, ESTADO_BUSQUEDA_PARTIAL_PROVIDER_FAILURE,
+)
 from citas_evidencia import (
     formatear_contexto_papers, detectar_citas_alucinadas, detectar_citas_fuera_de_rango,
     detectar_negacion_contradictoria, limpiar_negacion_contradictoria,
@@ -657,17 +660,41 @@ def main(page: ft.Page):
                 registrar_solicitud(usuario_actual_id[0], "pubmed")
                 fila_pubmed = _agregar_paso_proceso(columna_pasos, t("buscando_pubmed", idioma_var[0]))
                 try:
-                    papers_relevantes, n_nuevos, total_unicos, intentos_debug = buscar_pubmed_estructurado(texto, usuario_actual_id[0])
+                    papers_relevantes, n_nuevos, total_unicos, intentos_debug, estado_busqueda = buscar_pubmed_estructurado(texto, usuario_actual_id[0])
                     papers_relevantes = filtrar_papers_por_evidencia(papers_relevantes, modo_evidencia_var[0])
                     if papers_relevantes:
                         contexto_pubmed = formatear_contexto_papers(papers_relevantes)
                         _completar_paso_proceso(fila_pubmed, t("pubmed_con_resultados", idioma_var[0], n=len(papers_relevantes)))
                         agregar_papers_a_chat(chat_view, page, papers_relevantes, n_nuevos, total_unicos)
+                    elif estado_busqueda["estado"] == ESTADO_BUSQUEDA_PROVIDER_ERROR:
+                        # Distinto de "no hay papers": aquí la búsqueda de
+                        # literatura falló (red/proveedores caídos), no
+                        # encontró genuinamente cero resultados. La
+                        # respuesta que sigue se basa solo en el
+                        # conocimiento general del modelo — se lo dejamos
+                        # explícito al estudiante en vez de que parezca
+                        # una búsqueda normal sin hallazgos.
+                        _completar_paso_proceso(
+                            fila_pubmed,
+                            "⚠️ La búsqueda de literatura falló (PubMed/Europe PMC/Semantic Scholar no "
+                            "respondieron) — la respuesta se basará solo en el conocimiento general del "
+                            "modelo, sin papers verificados.",
+                            error=True,
+                        )
                     else:
                         _completar_paso_proceso(
                             fila_pubmed,
                             t("pubmed_sin_resultados", idioma_var[0], n=total_unicos),
                         )
+                    if estado_busqueda["estado"] == ESTADO_BUSQUEDA_PARTIAL_PROVIDER_FAILURE:
+                        proveedores_caidos = ", ".join(
+                            nombre for nombre, v in estado_busqueda["proveedores"].items() if v == "error"
+                        )
+                        columna_pasos.controls.append(
+                            ft.Text(f"⚠️ Proveedor(es) con falla esta búsqueda: {proveedores_caidos} "
+                                    "(los demás sí respondieron)", color="#f59e0b", size=10, italic=True)
+                        )
+                        page.update()
                     if intentos_debug:
                         columna_pasos.controls.append(
                             ft.Text("🔎 " + " | ".join(intentos_debug), color="#475569", size=10, italic=True)
@@ -821,7 +848,7 @@ def main(page: ft.Page):
                 fact = None
                 if switch_factualidad_var and fuentes:
                     fila_fact = _agregar_paso_proceso(columna_pasos, t("verificando_afirmaciones", idioma_var[0]))
-                    contexto_juez = construir_contexto_para_juez(papers_relevantes, fragmentos_relevantes)
+                    contexto_juez = construir_contexto_para_juez(contexto_pubmed, bloque_pdf)
                     fact = evaluar_factualidad(full_response, contexto_juez)
                     _completar_paso_proceso(fila_fact, t("afirmaciones_verificadas", idioma_var[0]))
 
