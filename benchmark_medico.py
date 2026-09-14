@@ -16,6 +16,26 @@ pensada para correr de vez en cuando (ej. después de cambiar el
 SYSTEM_PROMPT o el modelo) y ver si la precisión sube o baja, no algo
 que el estudiante vea nunca.
 
+Feedback externo (John6666, foro de Hugging Face, prioridad 1): este
+benchmark le manda la pregunta DIRECTO al modelo (ver
+preguntar_al_modelo() más abajo) — NO pasa por el SYSTEM_PROMPT de la
+app, ni por retrieval de PubMed, ni por el contexto de PDFs, ni por el
+clasificador de riesgo clínico, ni por la capa de citas/factualidad.
+Eso lo hace un buen baseline de "qué tan bien contesta el modelo base"
+(nivel modelo/MCQ), pero un cambio en el número que da este script NO
+es evidencia de que un cambio en el prompt/RAG/citas mejoró o empeoró
+la APLICACIÓN completa — esas capas ni se ejecutan aquí.
+
+Para medir cambios a nivel aplicación se necesita un segundo conjunto,
+chico y determinístico, que sí pase por el pipeline completo (ver
+regresion_e2e.py): un caso donde la respuesta está en un PDF subido,
+uno donde el PDF no trae evidencia suficiente, uno con dos fuentes que
+se contradicen, uno donde el proveedor de literatura falla, un PDF con
+contenido tipo prompt-injection, y unas cuantas paráfrasis de riesgo
+clínico. Ese conjunto separa model quality → retrieval → evidencia
+entregada al modelo → generación → citas/juicio, en vez de colapsar
+todo en un solo score como hace este benchmark.
+
 CÓMO CORRERLO:
     python benchmark_medico.py
 Necesita las mismas variables de entorno que la app (GROQ_API_KEY vía
@@ -377,7 +397,7 @@ def correr_benchmark():
             print(f"  Correcta: {correcta} | Modelo eligió: {elegida} (respuesta cruda: {r['respuesta_modelo_cruda']!r})")
             print(f"  Por qué: {r['explicacion']}")
     else:
-        print("\n🎉 El modelo acertó todas las preguntas del benchmark.")
+        print("\n El modelo acertó todas las preguntas del benchmark.")
 
     return {"total": total, "aciertos": aciertos, "por_especialidad": por_especialidad, "fallidas": fallidas}
 
