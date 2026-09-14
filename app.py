@@ -32,8 +32,9 @@ if __name__ == "__main__" and "--test-pubmed" in sys.argv:
     usuario_test, _ = crear_usuario(f"_test_{int(time.time())}", "test1234")
     print(f"Consulta: {consulta_prueba!r}\n")
 
-    papers_1, n_nuevos_1, total_1, debug_1 = buscar_pubmed_estructurado(consulta_prueba, usuario_test)
+    papers_1, n_nuevos_1, total_1, debug_1, estado_1 = buscar_pubmed_estructurado(consulta_prueba, usuario_test)
     print(f"1ª búsqueda: {len(papers_1)} papers relevantes ({n_nuevos_1} nuevos) · {total_1} únicos")
+    print(f"   Estado: {estado_1}")
     print(f"   Intentos: {debug_1}\n")
     for i, p in enumerate(papers_1, start=1):
         score = p.get("score")
@@ -45,7 +46,7 @@ if __name__ == "__main__" and "--test-pubmed" in sys.argv:
         print()
 
     
-    papers_2, n_nuevos_2, total_2, debug_2 = buscar_pubmed_estructurado(consulta_prueba, usuario_test)
+    papers_2, n_nuevos_2, total_2, debug_2, estado_2 = buscar_pubmed_estructurado(consulta_prueba, usuario_test)
     print(f"2ª búsqueda (dedup): {len(papers_2)} papers relevantes ({n_nuevos_2} nuevos) · {total_2} únicos")
     if n_nuevos_2 == 0 and len(papers_2) > 0:
         print("✅ Dedup OK: no se insertaron filas nuevas, pero el modelo sigue recibiendo los papers como contexto.")
