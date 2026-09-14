@@ -409,11 +409,28 @@ def resumen_evidencia_citada(fuentes: list) -> dict:
         "niveles_presentes": niveles_unicos,
     }
 
-def construir_contexto_para_juez(papers, fragmentos) -> str:
+def construir_contexto_para_juez_desde_fuentes_crudas(papers, fragmentos) -> str:
     """
-    Arma el bloque de fuentes numerado que se le da al juez de
-    factualidad para comparar contra la respuesta del asistente. Usa el
-    mismo esquema de numeración [n]/[Fn] que ve el modelo principal.
+    Reconstruye el bloque de fuentes desde los papers/fragmentos crudos,
+    con su propio recorte de 1200 caracteres por resumen — MÁS GRANDE
+    que los 600 caracteres (MAX_CHARS_ABSTRACT_CONTEXTO) que de verdad
+    recibió el generador en formatear_contexto_papers().
+
+    Feedback externo (John6666, foro de Hugging Face, prioridad 2): esta
+    era la función que se usaba antes para armar el contexto del juez de
+    factualidad, y responde a una pregunta distinta de "¿la respuesta
+    fue fiel a lo que el generador realmente vio?" — responde más bien
+    "¿la respuesta es compatible con toda la evidencia que la app pudo
+    reunir en algún punto de la búsqueda?" (evaluación de corrección más
+    amplia, no de fidelidad). Además, al truncar el string ya unido a
+    MAX_CHARS_EVAL_CONTEXTO de un tirón, los fragmentos de PDF (que se
+    agregan después de los papers) podían desaparecer del todo si los
+    abstracts de los papers ya llenaban el cupo.
+
+    Se conserva por si en el futuro se quiere ese chequeo más amplio
+    como métrica separada, pero el juez de factualidad por default usa
+    construir_contexto_para_juez() de abajo, que reutiliza el contexto
+    exacto que ya vio el generador (fidelidad/faithfulness).
     """
     partes = []
     for i, p in enumerate(papers, start=1):
@@ -426,6 +443,40 @@ def construir_contexto_para_juez(papers, fragmentos) -> str:
     for j, (similitud, fuente, texto_frag, tipo_texto) in enumerate(fragmentos, start=1):
         partes.append(f"[F{j}] Fuente: {fuente}. Texto: {(texto_frag or '')[:1200]}")
     return "\n\n".join(partes)[:MAX_CHARS_EVAL_CONTEXTO]
+
+
+def construir_contexto_para_juez(contexto_pubmed: str, bloque_pdf: str) -> str:
+    """
+    Arma el contexto que se le da al juez de factualidad reutilizando el
+    MISMO texto — mismos recortes de abstract, mismos fragmentos [Fn] —
+    que ya se le mandó al generador (contexto_pubmed de
+    formatear_contexto_papers() y bloque_pdf armado en app_ui.py), en
+    vez de reconstruirlo desde cero con otros límites de caracteres.
+
+    Esto responde a "¿la respuesta fue fiel a la evidencia que el
+    generador REALMENTE recibió?" (fidelidad), que es la pregunta que
+    tiene sentido para un juez que corre inmediatamente después de esa
+    generación. La pregunta más amplia — "¿es compatible con toda la
+    evidencia que la app pudo reunir?" — es otra métrica, y quedaría
+    para construir_contexto_para_juez_desde_fuentes_crudas() si algún
+    día se quiere por separado.
+
+    Si el total excede MAX_CHARS_EVAL_CONTEXTO, se recorta cada bloque
+    (papers, PDF) en proporción a su tamaño en vez de cortar el string
+    final ya unido de un tirón — así un bloque no desaparece solo por
+    venir después en la concatenación.
+    """
+    bloques = [b for b in (contexto_pubmed or "", bloque_pdf or "") if b.strip()]
+    if not bloques:
+        return ""
+    total_chars = sum(len(b) for b in bloques)
+    if total_chars <= MAX_CHARS_EVAL_CONTEXTO:
+        return "\n\n".join(bloques)
+    partes = []
+    for b in bloques:
+        cupo = max(200, int(MAX_CHARS_EVAL_CONTEXTO * (len(b) / total_chars)))
+        partes.append(b[:cupo])
+    return "\n\n".join(partes)
 
 def _parsear_json_juez(texto: str):
     """Extrae el primer bloque {...} del texto del juez y lo parsea como
