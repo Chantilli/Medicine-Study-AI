@@ -12,6 +12,7 @@ import re
 import time
 import threading
 import sqlite3
+from datetime import datetime
 import urllib.request
 import urllib.parse
 import urllib.error
@@ -142,6 +143,9 @@ ESTADO_BUSQUEDA_ZERO_RESULTS = "zero_results"
 ESTADO_BUSQUEDA_PARTIAL_PROVIDER_FAILURE = "partial_provider_failure"
 ESTADO_BUSQUEDA_PROVIDER_ERROR = "provider_error"
 
+ANIO_INICIO_RECIENTE = 2020
+ANIO_FIN_RECIENTE = datetime.now().year
+
 
 def _calcular_estado_busqueda(proveedores: dict, hay_papers: bool) -> dict:
     """
@@ -190,13 +194,13 @@ def ranking_semantico(consulta, papers, top_k=TOP_K_PAPERS):
     if not modelo_embeddings:
         for p in papers:
             p["score"] = None
-        return papers[:top_k]
+            return sorted(papers, key=_clave_relevancia_recencia)[:top_k]
 
     vector_consulta = generar_embedding(consulta)
     if vector_consulta is None:
         for p in papers:
             p["score"] = None
-        return papers[:top_k]
+            return sorted(papers, key=_clave_relevancia_recencia)[:top_k]
 
    
     textos = []
@@ -212,15 +216,24 @@ def ranking_semantico(consulta, papers, top_k=TOP_K_PAPERS):
         p["_vector"] = vector_paper
         p["score"] = float(np.dot(vector_consulta, vector_paper))
 
-    ordenados = sorted(
-        papers,
-        key=lambda p: p["score"] if p["score"] is not None else -1.0,
-        reverse=True,
-    )
+    ordenados = sorted(papers, key=_clave_relevancia_recencia)
     sobre_umbral = [p for p in ordenados if p["score"] is not None and p["score"] >= UMBRAL_SIMILITUD_PAPER]
     if sobre_umbral:
         return sobre_umbral[:top_k]
     return ordenados[:min(3, len(ordenados))]
+
+
+def _anio_paper(paper: dict) -> int:
+    """Devuelve el año de publicación o cero si la fuente no lo informa."""
+    valor = str(paper.get("anio") or "")
+    coincidencia = re.search(r"\b(19|20)\d{2}\b", valor)
+    return int(coincidencia.group(0)) if coincidencia else 0
+
+
+def _clave_relevancia_recencia(paper: dict) -> tuple:
+    """Relevancia primero; entre resultados equivalentes, el más reciente."""
+    score = paper.get("score")
+    return (-(score if score is not None else 0.0), -_anio_paper(paper))
 
 def contar_papers_usuario(usuario_id):
     conn = sqlite3.connect(DB_PATH)
@@ -466,8 +479,14 @@ def _es_query_valida(linea: str) -> bool:
         return False
     return True
 
-def _esearch_pubmed(query: str) -> list:
+def _esearch_pubmed(query: str, fecha_inicio: int = None, fecha_fin: int = None) -> list:
     """Una sola llamada a esearch. Devuelve la lista de PMIDs (puede ser vacía)."""
+    if fecha_inicio is not None and fecha_fin is not None:
+        query = (
+            f"({query}) AND "
+            f'("{fecha_inicio}/01/01"[Date - Publication] : '
+            f'"{fecha_fin}/12/31"[Date - Publication])'
+        )
     query_encoded = urllib.parse.quote_plus(query)
     _throttle_pubmed()
     url_search = (
@@ -540,18 +559,30 @@ def buscar_pubmed_estructurado(consulta, usuario_id):
         intentos_debug = []
         pubmed_llamadas_ok = 0
         pubmed_llamadas_error = 0
-        for variante in variantes:
-            try:
-                resultado = _esearch_pubmed(variante)
-                pubmed_llamadas_ok += 1
-            except Exception as ex:
-                pubmed_llamadas_error += 1
-                intentos_debug.append(f"'{variante}' → error de red: {ex}")
-                continue
-            intentos_debug.append(f"'{variante}' → {len(resultado)} resultados")
-            if resultado:
-                id_list = resultado
-                query_usada = variante
+        for fase, fecha_inicio, fecha_fin in (
+            ("reciente 2020-{}".format(ANIO_FIN_RECIENTE), ANIO_INICIO_RECIENTE, ANIO_FIN_RECIENTE),
+            ("histórica ampliada", None, None),
+        ):
+            for variante in variantes:
+                try:
+                    resultado = _esearch_pubmed(variante, fecha_inicio, fecha_fin)
+                    pubmed_llamadas_ok += 1
+                except Exception as ex:
+                    pubmed_llamadas_error += 1
+                    intentos_debug.append(f"'{variante}' ({fase}) → error de red: {ex}")
+                    continue
+                intentos_debug.append(f"'{variante}' ({fase}) → {len(resultado)} resultados")
+                if resultado:
+                    id_list = resultado
+                    query_usada = variante
+                    break
+            if id_list:
+                if fase == "histórica ampliada":
+                    intentos_debug.insert(
+                        0,
+                        f"ℹ️ No se encontraron resultados recientes (2020-{ANIO_FIN_RECIENTE}); "
+                        "se amplió la investigación a años anteriores.",
+                    )
                 break
         estado_pubmed = "ok" if pubmed_llamadas_ok > 0 else "error"
         papers = []
@@ -573,10 +604,12 @@ def buscar_pubmed_estructurado(consulta, usuario_id):
 
         
         query_otras_fuentes = query_usada or (variantes[0] if variantes else consulta)
+        hubo_fallback_historico = any("histórica ampliada" in intento for intento in intentos_debug)
         pmids_vistos = {p["pmid"] for p in papers if p.get("pmid")}
         dois_vistos = {p["doi"] for p in papers if p.get("doi")}
 
-        papers_epmc, epmc_ok = buscar_europepmc(query_otras_fuentes)
+        rango_fuente = None if hubo_fallback_historico else (ANIO_INICIO_RECIENTE, ANIO_FIN_RECIENTE)
+        papers_epmc, epmc_ok = buscar_europepmc(query_otras_fuentes, rango_anios=rango_fuente)
         n_epmc_nuevos = _fusionar_sin_duplicados(papers, papers_epmc, pmids_vistos, dois_vistos)
         if papers_epmc:
             intentos_debug.append(
@@ -586,7 +619,7 @@ def buscar_pubmed_estructurado(consulta, usuario_id):
         elif not epmc_ok:
             intentos_debug.append(f"Europe PMC ('{query_otras_fuentes}') → error de proveedor")
 
-        papers_s2, s2_ok = buscar_semantic_scholar(query_otras_fuentes)
+        papers_s2, s2_ok = buscar_semantic_scholar(query_otras_fuentes, rango_anios=rango_fuente)
         n_s2_nuevos = _fusionar_sin_duplicados(papers, papers_s2, pmids_vistos, dois_vistos)
         if papers_s2:
             intentos_debug.append(
@@ -611,10 +644,7 @@ def buscar_pubmed_estructurado(consulta, usuario_id):
         return papers_rankeados, len(nuevos), total_unicos, intentos_debug, estado_busqueda
 
     except (urllib.error.URLError, ET.ParseError, TimeoutError, ValueError, OSError, sqlite3.Error) as ex:
-        # Este catch cubre fallas fuera del bucle por-variante de arriba
-        # (ej. efetch de PubMed o la base de datos), así que aquí no hay
-        # forma de saber si Europe PMC/Semantic Scholar habrían
-        # funcionado — se reporta como falla total del proveedor.
+        
         estado_busqueda = {
             "estado": ESTADO_BUSQUEDA_PROVIDER_ERROR,
             "proveedores": {"pubmed": "error", "europepmc": "error", "semantic_scholar": "error"},
@@ -699,7 +729,7 @@ def parsear_resultado_europepmc(item: dict):
         "fuente_bd": "Europe PMC",
     }
 
-def buscar_europepmc(query: str, retmax: int = 10) -> tuple:
+def buscar_europepmc(query: str, retmax: int = 10, rango_anios: tuple = None) -> tuple:
     """
     Busca en Europe PMC (MEDLINE + PMC + preprints de bioRxiv/medRxiv).
     No requiere API key. Nunca lanza excepción hacia afuera: si falla la
@@ -712,6 +742,11 @@ def buscar_europepmc(query: str, retmax: int = 10) -> tuple:
     la que consume _calcular_estado_busqueda() más arriba.
     """
     try:
+        if rango_anios:
+            query = (
+                f"({query}) AND FIRST_PDATE:[{rango_anios[0]}-01-01 "
+                f"TO {rango_anios[1]}-12-31]"
+            )
         query_encoded = urllib.parse.quote_plus(query)
         url = (
             f"{EUROPEPMC_BASE}?query={query_encoded}&format=json"
@@ -806,7 +841,7 @@ def parsear_resultado_semantic_scholar(item: dict):
     }
 
 
-def buscar_semantic_scholar(query: str, limit: int = 10) -> tuple:
+def buscar_semantic_scholar(query: str, limit: int = 10, rango_anios: tuple = None) -> tuple:
     """
     Busca en Semantic Scholar. No requiere API key. Nunca lanza
     excepción hacia afuera: si falla la red o se topa con el límite de
@@ -821,7 +856,12 @@ def buscar_semantic_scholar(query: str, limit: int = 10) -> tuple:
     try:
         query_encoded = urllib.parse.quote_plus(query)
         campos = "title,abstract,year,authors,externalIds,venue,publicationTypes,journal"
-        url = f"{SEMANTIC_SCHOLAR_BASE}?query={query_encoded}&limit={limit}&fields={campos}"
+        parametros = (
+            f"?query={query_encoded}&limit={limit}&fields={campos}"
+        )
+        if rango_anios:
+            parametros += f"&year={rango_anios[0]}-{rango_anios[1]}"
+        url = f"{SEMANTIC_SCHOLAR_BASE}{parametros}"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=10) as respuesta:
             datos = json.loads(respuesta.read().decode('utf-8'))
