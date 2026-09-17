@@ -507,6 +507,13 @@ def evaluar_factualidad(respuesta: str, contexto_fuentes: str):
     prompt = (
         "Eres un juez médico riguroso. Compara CADA afirmación clínica de la "
         "respuesta del asistente contra las fuentes numeradas que se te dan.\n\n"
+        "No uses conocimiento externo para validar una afirmación. Para cada afirmación cuantitativa "
+        "o comparativa (ranking, porcentaje, conteo, fecha, 'más común', 'top' o 'principal'), "
+        "verifica que la fuente respalde exactamente la misma población, geografía, periodo y medida. "
+        "Si la fuente solo habla de Estados Unidos, no la aceptes como evidencia de países de altos "
+        "ingresos o del mundo. Si el resumen no contiene el dato exacto, clasifícala como No verificable, "
+        "aunque la afirmación parezca médicamente plausible. No corrijas la respuesta usando memoria: "
+        "identifica la afirmación no respaldada y explica qué alcance falta.\n\n"
         "Clasifica cada afirmación como: Soportada | No soportada | No verificable.\n\n"
         "Devuelve EXCLUSIVAMENTE JSON con este formato exacto, sin texto extra:\n"
         '{"score": <0-100>, "afirmaciones": ['
