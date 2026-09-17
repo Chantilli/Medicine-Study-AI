@@ -109,6 +109,8 @@ def construir_panel_fuentes(fuentes: list):
                 identificadores.append(f"PMID: {f['pmid']}")
             if f.get("doi"):
                 identificadores.append(f"DOI: {f['doi']}")
+            if f.get("fuente_bd"):
+                identificadores.insert(0, f"Fuente: {f['fuente_bd']}")
             filas.append(
                 ft.Container(
                     content=ft.Column([
@@ -186,4 +188,3 @@ def anexar_badge_factualidad(chat_view, page, fact: dict):
         )
     )
     page.update()
-
