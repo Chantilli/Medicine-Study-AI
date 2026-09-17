@@ -19,6 +19,7 @@ from extraccion_tablas import extraer_tablas_pdf
 from pubmed_search import (
     buscar_pubmed_estructurado, filtrar_papers_por_evidencia, MODOS_EVIDENCIA,
     ESTADO_BUSQUEDA_PROVIDER_ERROR, ESTADO_BUSQUEDA_PARTIAL_PROVIDER_FAILURE,
+    ANIO_FIN_RECIENTE,
 )
 from citas_evidencia import (
     formatear_contexto_papers, detectar_citas_alucinadas, detectar_citas_fuera_de_rango,
@@ -662,18 +663,22 @@ def main(page: ft.Page):
                 try:
                     papers_relevantes, n_nuevos, total_unicos, intentos_debug, estado_busqueda = buscar_pubmed_estructurado(texto, usuario_actual_id[0])
                     papers_relevantes = filtrar_papers_por_evidencia(papers_relevantes, modo_evidencia_var[0])
+                    busqueda_profunda = any(
+                        "No se encontraron resultados recientes" in intento
+                        for intento in intentos_debug
+                    )
                     if papers_relevantes:
                         contexto_pubmed = formatear_contexto_papers(papers_relevantes)
+                        if busqueda_profunda:
+                            contexto_pubmed = (
+                                "[NOTA DE BÚSQUEDA: no se encontraron resultados relevantes entre "
+                                f"2020 y {ANIO_FIN_RECIENTE}; la investigación se amplió a años anteriores.]\n\n"
+                                + contexto_pubmed
+                            )
                         _completar_paso_proceso(fila_pubmed, t("pubmed_con_resultados", idioma_var[0], n=len(papers_relevantes)))
                         agregar_papers_a_chat(chat_view, page, papers_relevantes, n_nuevos, total_unicos)
                     elif estado_busqueda["estado"] == ESTADO_BUSQUEDA_PROVIDER_ERROR:
-                        # Distinto de "no hay papers": aquí la búsqueda de
-                        # literatura falló (red/proveedores caídos), no
-                        # encontró genuinamente cero resultados. La
-                        # respuesta que sigue se basa solo en el
-                        # conocimiento general del modelo — se lo dejamos
-                        # explícito al estudiante en vez de que parezca
-                        # una búsqueda normal sin hallazgos.
+                        
                         _completar_paso_proceso(
                             fila_pubmed,
                             "⚠️ La búsqueda de literatura falló (PubMed/Europe PMC/Semantic Scholar no "
@@ -686,6 +691,14 @@ def main(page: ft.Page):
                             fila_pubmed,
                             t("pubmed_sin_resultados", idioma_var[0], n=total_unicos),
                         )
+                    if busqueda_profunda:
+                        columna_pasos.controls.append(
+                            ft.Text(
+                                t("pubmed_sin_recientes", idioma_var[0], fin=ANIO_FIN_RECIENTE),
+                                color="#f59e0b", size=11, italic=True,
+                            )
+                        )
+                        page.update()
                     if estado_busqueda["estado"] == ESTADO_BUSQUEDA_PARTIAL_PROVIDER_FAILURE:
                         proveedores_caidos = ", ".join(
                             nombre for nombre, v in estado_busqueda["proveedores"].items() if v == "error"
