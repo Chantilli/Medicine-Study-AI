@@ -183,9 +183,7 @@ def _clave_deduplicacion_paper(paper):
     return claves
 
 
-# ============================================================================
-# RANKING HÍBRIDO CON MÚLTIPLES COMPONENTES (MEJORADO)
-# ============================================================================
+
 
 BONIFICACION_EVIDENCIA = {
     "Revisión (meta-análisis)": 0.20,
@@ -814,7 +812,6 @@ def _calcular_estado_busqueda(
     else:
         estado = ESTADO_BUSQUEDA_OK
 
-    # Calcular confianza de la búsqueda
     if not hay_papers:
         confianza_busqueda = "baja"
     elif consultas_con_resultados <= 1:
@@ -832,9 +829,7 @@ def _calcular_estado_busqueda(
     }
 
 
-# ============================================================================
-# FLUJO PRINCIPAL DE BÚSQUEDA (MEJORADO)
-# ============================================================================
+
 
 def buscar_pubmed_estructurado(consulta, usuario_id):
     """
@@ -1124,6 +1119,7 @@ def buscar_europepmc(query: str, retmax: int = 10, rango_anios: tuple = None) ->
 
 
 SEMANTIC_SCHOLAR_BASE = "https://api.semanticscholar.org/graph/v1/paper/search"
+SEMANTIC_SCHOLAR_API_KEY = os.environ.get("SEMANTIC_SCHOLAR_API_KEY", "").strip()
 
 _S2_TIPO_A_PUBMED = {
     "review": "Review",
@@ -1209,7 +1205,10 @@ def buscar_semantic_scholar(query: str, limit: int = 10, rango_anios: tuple = No
         if rango_anios:
             parametros += f"&year={rango_anios[0]}-{rango_anios[1]}"
         url = f"{SEMANTIC_SCHOLAR_BASE}{parametros}"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        headers = {"User-Agent": "Mozilla/5.0"}
+        if SEMANTIC_SCHOLAR_API_KEY:
+            headers["x-api-key"] = SEMANTIC_SCHOLAR_API_KEY
+        req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=10) as respuesta:
             datos = json.loads(respuesta.read().decode('utf-8'))
         resultados = datos.get("data") or []
