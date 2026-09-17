@@ -346,6 +346,7 @@ def construir_lista_fuentes(papers, fragmentos, respuesta: str) -> list:
             "indice": i,
             "pmid": p.get("pmid"),
             "doi": p.get("doi"),
+            "fuente_bd": p.get("fuente_bd"),
             "titulo": p.get("titulo", ""),
             "nivel_evidencia": clasificar_evidencia(p.get("tipos_publicacion", [])),
             "citado": ("paper", i) in citadas,
