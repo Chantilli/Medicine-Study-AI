@@ -193,6 +193,13 @@ TEXTOS = {
         "de": "PubMed: {n} relevante Studie(n) gefunden",
         "zh": "PubMed：找到 {n} 篇相关文献",
     },
+    "pubmed_sin_recientes": {
+        "es": "No se encontraron papers relevantes entre 2020 y {fin}; se amplió la investigación a años anteriores.",
+        "en": "No relevant papers were found between 2020 and {fin}; the search was expanded to earlier years.",
+        "fr": "Aucun article pertinent trouvé entre 2020 et {fin} ; la recherche a été étendue aux années précédentes.",
+        "de": "Zwischen 2020 und {fin} wurden keine relevanten Studien gefunden; die Suche wurde auf frühere Jahre erweitert.",
+        "zh": "在 2020 至 {fin} 年间未找到相关文献；已将搜索扩展到更早年份。",
+    },
     "fragmentos_usados": {
         "es": "{n} fragmento(s) de tus documentos usados como contexto",
         "en": "{n} fragment(s) from your documents used as context",
