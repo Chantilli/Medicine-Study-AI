@@ -9,6 +9,7 @@ import json
 
 from config import client, MODELO_JUEZ, MAX_TOKENS_JUEZ, MAX_CHARS_EVAL_CONTEXTO, MAX_CHARS_ABSTRACT_CONTEXTO
 from pubmed_search import clasificar_evidencia, _ORDEN_JERARQUIA_EVIDENCIA
+from traducciones import t, t_categoria
 
 
 def _autores_cita(autores, limite=6):
@@ -103,7 +104,7 @@ def formatear_cita_apa(p):
         piezas.append(f"https://doi.org/{p['doi']}")
     return " ".join(piezas).strip()
 
-def formatear_contexto_papers(papers):
+def formatear_contexto_papers(papers, idioma="es"):
     """
     Convierte los papers rankeados en el bloque de texto numerado que se
     inyecta al modelo: [1], [2], ... con su cita Vancouver y su resumen.
@@ -118,7 +119,7 @@ def formatear_contexto_papers(papers):
         texto += f"[{i}]{relevancia}\n"
         texto += formatear_cita_vancouver(p) + "\n"
         categoria = clasificar_evidencia(p.get("tipos_publicacion", []))
-        texto += f"Nivel de evidencia: {categoria}\n"
+        texto += f"{t('nivel_evidencia', idioma)}: {t_categoria(categoria, idioma)}\n"
         identificadores = []
         if p.get("pmid"):
             identificadores.append(f"PMID: {p['pmid']}")
