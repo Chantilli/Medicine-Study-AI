@@ -496,8 +496,9 @@ _CATEGORIAS_EVIDENCIA = {
     "Retrospective Study": "Estudio retrospectivo",
     "Prospective Study": "Estudio prospectivo",
     "Multicenter Study": "Sin clasificar",  
+    "Video-Audio Media": "Artículo de video animado (financiado por industria; no es un estudio de investigación revisado por pares)",
+    "Video": "Artículo de video animado (financiado por industria; no es un estudio de investigación revisado por pares)",
 }
-
 
 _ORDEN_JERARQUIA_EVIDENCIA = [
     "Revisión (meta-análisis)",
@@ -871,6 +872,7 @@ def _calcular_estado_busqueda(
     else:
         estado = ESTADO_BUSQUEDA_OK
 
+    # Calcular confianza de la búsqueda
     if not hay_papers:
         confianza_busqueda = "baja"
     elif consultas_con_resultados <= 1:
