@@ -25,6 +25,7 @@ from citas_evidencia import (
     formatear_contexto_papers, detectar_citas_alucinadas, detectar_citas_fuera_de_rango,
     detectar_negacion_contradictoria, limpiar_negacion_contradictoria,
     verificar_consistencia_fisiologica, construir_lista_fuentes, construir_contexto_para_juez,
+    eliminar_referencias_no_citadas,
     evaluar_factualidad, resumen_evidencia_citada,
 )
 from ui_helpers import agregar_papers_a_chat, construir_panel_fuentes, anexar_badge_factualidad
@@ -804,6 +805,12 @@ def main(page: ft.Page):
                         "no las tomes como evidencia real.",
                         tipo="error",
                     ))
+
+                full_response_limpio = eliminar_referencias_no_citadas(full_response)
+                if full_response_limpio != full_response:
+                    full_response = full_response_limpio
+                    ai_markdown.value = full_response
+                    page.update()
 
                 citas_fuera_rango = detectar_citas_fuera_de_rango(
                     full_response, len(papers_relevantes), len(fragmentos_relevantes)
