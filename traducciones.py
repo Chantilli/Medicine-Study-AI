@@ -149,6 +149,13 @@ TEXTOS = {
     "niv_opinion": {"es": "Opinión/comentario", "en": "Opinion/commentary", "fr": "Opinion/commentaire", "de": "Meinung/Kommentar", "zh": "观点/评论"},
     "niv_preprint": {"es": "Preprint (sin revisión por pares)", "en": "Preprint (not peer-reviewed)", "fr": "Préimpression (non révisée par les pairs)", "de": "Preprint (nicht begutachtet)", "zh": "预印本（未经同行评审）"},
     "niv_sin_clasificar": {"es": "Sin clasificar", "en": "Unclassified", "fr": "Non classé", "de": "Nicht klassifiziert", "zh": "未分类"},
+    "niv_video_industria": {
+        "es": "Artículo de video animado (financiado por industria; no es un estudio de investigación revisado por pares)",
+        "en": "Animated video article (industry-funded; not a peer-reviewed research study)",
+        "fr": "Article vidéo animé (financé par l'industrie ; pas une étude de recherche évaluée par les pairs)",
+        "de": "Animierter Videoartikel (industriefinanziert; keine peer-reviewte Forschungsstudie)",
+        "zh": "动画视频文章（由工业界资助；不是经同行评审的研究）",
+    },
 
     "badge_evidencia_citada": {
         "es": "Evidencia más fuerte citada: {nivel} ({n} fuente(s))",
@@ -649,6 +656,7 @@ _MAPA_CATEGORIAS = {
     "Opinión/comentario": "niv_opinion",
     "Preprint (sin revisión por pares)": "niv_preprint",
     "Sin clasificar": "niv_sin_clasificar",
+    "Artículo de video animado (financiado por industria; no es un estudio de investigación revisado por pares)": "niv_video_industria",
 }
 
 
