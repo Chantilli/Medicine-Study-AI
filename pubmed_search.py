@@ -496,7 +496,6 @@ _CATEGORIAS_EVIDENCIA = {
     "Retrospective Study": "Estudio retrospectivo",
     "Prospective Study": "Estudio prospectivo",
     "Multicenter Study": "Sin clasificar",  
-}
 
 _ORDEN_JERARQUIA_EVIDENCIA = [
     "Revisión (meta-análisis)",
