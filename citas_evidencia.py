@@ -123,7 +123,8 @@ def formatear_contexto_papers(papers, idioma="es"):
         texto += (
             f"[{i}]{relevancia}\n"
             f"ID DE REFERENCIA INMUTABLE: [{i}] — usa exactamente este número; "
-            "no renumeres ni reordenes las referencias.\n"
+            "no renumeres ni reordenes las referencias. Solo inclúyela en la lista final "
+            "si la citas explícitamente en el cuerpo.\n"
         )
         texto += formatear_cita_vancouver(p) + "\n"
         texto += f"Revista (metadatos): {p.get('revista') or '[nombre no disponible en los metadatos]'}\n"
