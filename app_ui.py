@@ -289,7 +289,9 @@ def main(page: ft.Page):
                 fila_respuesta, _ = _burbuja_ai(msg["content"], pregunta=ultima_pregunta_limpia)
                 chat_view.controls.append(fila_respuesta)
                 if msg.get("_fuentes"):
-                    chat_view.controls.append(construir_panel_fuentes(msg["_fuentes"]))
+                    chat_view.controls.append(
+                        construir_panel_fuentes(msg["_fuentes"], idioma_var[0])
+                    )
                 if msg.get("_factualidad"):
                     anexar_badge_factualidad(chat_view, page, msg["_factualidad"])
                 if msg.get("_evidencia"):
@@ -668,7 +670,9 @@ def main(page: ft.Page):
                         for intento in intentos_debug
                     )
                     if papers_relevantes:
-                        contexto_pubmed = formatear_contexto_papers(papers_relevantes)
+                        contexto_pubmed = formatear_contexto_papers(
+                            papers_relevantes, idioma_var[0]
+                        )
                         if busqueda_profunda:
                             contexto_pubmed = (
                                 "[NOTA DE BÚSQUEDA: no se encontraron resultados relevantes entre "
@@ -676,7 +680,10 @@ def main(page: ft.Page):
                                 + contexto_pubmed
                             )
                         _completar_paso_proceso(fila_pubmed, t("pubmed_con_resultados", idioma_var[0], n=len(papers_relevantes)))
-                        agregar_papers_a_chat(chat_view, page, papers_relevantes, n_nuevos, total_unicos)
+                        agregar_papers_a_chat(
+                            chat_view, page, papers_relevantes, n_nuevos,
+                            total_unicos, idioma_var[0]
+                        )
                     elif estado_busqueda["estado"] == ESTADO_BUSQUEDA_PROVIDER_ERROR:
                         
                         _completar_paso_proceso(
@@ -874,7 +881,9 @@ def main(page: ft.Page):
                 historial = recortar_historial(historial)
 
                 if fuentes:
-                    chat_view.controls.append(construir_panel_fuentes(fuentes))
+                    chat_view.controls.append(
+                        construir_panel_fuentes(fuentes, idioma_var[0])
+                    )
                 if fact:
                     anexar_badge_factualidad(chat_view, page, fact)
 
