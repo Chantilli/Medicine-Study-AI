@@ -268,6 +268,49 @@ def _componente_recencia(paper):
     return max(0.0, 1.0 - (antiguedad / 15.0))
 
 
+def _seleccionar_con_diversidad(papers_ordenados, top_k):
+    """
+    Conserva el mejor paper disponible de cada proveedor y completa el
+    resto por relevancia. PubMed se usa como etiqueta de respaldo para
+    papers antiguos que no traen `fuente_bd`.
+    """
+    if not papers_ordenados or top_k <= 0:
+        return []
+
+    seleccionados = []
+    identidades = set()
+    proveedores = set()
+
+    for paper in papers_ordenados:
+        proveedor = paper.get("fuente_bd") or "PubMed"
+        identidad = (
+            _normalizar_pmid(paper.get("pmid")),
+            _normalizar_doi(paper.get("doi")),
+            paper.get("titulo"),
+        )
+        if proveedor in proveedores or identidad in identidades:
+            continue
+        proveedores.add(proveedor)
+        identidades.add(identidad)
+        seleccionados.append(paper)
+        if len(seleccionados) >= top_k:
+            return seleccionados
+
+    for paper in papers_ordenados:
+        identidad = (
+            _normalizar_pmid(paper.get("pmid")),
+            _normalizar_doi(paper.get("doi")),
+            paper.get("titulo"),
+        )
+        if identidad in identidades:
+            continue
+        identidades.add(identidad)
+        seleccionados.append(paper)
+        if len(seleccionados) >= top_k:
+            break
+    return seleccionados
+
+
 def ranking_semantico(consulta, papers, top_k=TOP_K_PAPERS):
     """
     Ranking híbrido de papers.
@@ -294,13 +337,14 @@ def ranking_semantico(consulta, papers, top_k=TOP_K_PAPERS):
                 + 0.10 * _componente_recencia(paper)
                 - _penalizacion_fuente(paper)
             )
-        return sorted(
+        ordenados = sorted(
             papers,
             key=lambda p: (
                 -(p.get("score_final") or 0.0),
                 -_anio_paper(p),
             ),
-        )[:top_k]
+        )
+        return _seleccionar_con_diversidad(ordenados, top_k)
 
     vector_consulta = generar_embedding(consulta)
 
@@ -313,13 +357,14 @@ def ranking_semantico(consulta, papers, top_k=TOP_K_PAPERS):
                 + 0.10 * _componente_recencia(paper)
                 - _penalizacion_fuente(paper)
             )
-        return sorted(
+        ordenados = sorted(
             papers,
             key=lambda p: (
                 -(p.get("score_final") or 0.0),
                 -_anio_paper(p),
             ),
-        )[:top_k]
+        )
+        return _seleccionar_con_diversidad(ordenados, top_k)
 
     textos = []
     for paper in papers:
@@ -366,26 +411,8 @@ def ranking_semantico(consulta, papers, top_k=TOP_K_PAPERS):
         and paper["score_semantico"] >= UMBRAL_SIMILITUD_PAPER
     ]
 
-    if len(sobre_umbral) >= top_k:
-        return sobre_umbral[:top_k]
-
-    seleccionados = []
-    ids_seleccionados = set()
-
-    for paper in sobre_umbral + ordenados:
-        identidad = (
-            _normalizar_pmid(paper.get("pmid")),
-            _normalizar_doi(paper.get("doi")),
-            paper.get("titulo"),
-        )
-        if identidad in ids_seleccionados:
-            continue
-        ids_seleccionados.add(identidad)
-        seleccionados.append(paper)
-        if len(seleccionados) >= top_k:
-            break
-
-    return seleccionados
+    candidatos = sobre_umbral + ordenados
+    return _seleccionar_con_diversidad(candidatos, top_k)
 
 
 def _anio_paper(paper: dict) -> int:
@@ -425,7 +452,7 @@ _CATEGORIAS_EVIDENCIA = {
     "Clinical Trial, Phase III": "Evidencia primaria (ensayo clínico)",
     "Clinical Trial, Phase IV": "Evidencia primaria (ensayo clínico)",
     "Observational Study": "Evidencia primaria (observacional)",
-    "Comparative Study": "Sin clasificar",  # Demasiado ambiguo
+    "Comparative Study": "Sin clasificar",  
     "Case Reports": "Evidencia primaria (reporte de caso)",
     "Editorial": "Opinión/comentario",
     "Comment": "Opinión/comentario",
@@ -437,7 +464,7 @@ _CATEGORIAS_EVIDENCIA = {
     "Validation Study": "Estudio de validación",
     "Retrospective Study": "Estudio retrospectivo",
     "Prospective Study": "Estudio prospectivo",
-    "Multicenter Study": "Sin clasificar",  # Demasiado ambiguo
+    "Multicenter Study": "Sin clasificar",  
 }
 
 _ORDEN_JERARQUIA_EVIDENCIA = [
