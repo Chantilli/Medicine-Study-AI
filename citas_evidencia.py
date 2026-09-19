@@ -200,6 +200,49 @@ def detectar_citas_fuera_de_rango(respuesta: str, n_papers: int, n_fragmentos: i
         "fragmentos_invalidos": sorted(n for n in fragmentos_citados if n < 1 or n > n_fragmentos),
     }
 
+
+def eliminar_referencias_no_citadas(respuesta: str) -> str:
+    """
+    Elimina de la sección final de referencias las entradas que no aparecen
+    citadas en el cuerpo. Conserva los IDs originales para no desalinear
+    las citas válidas.
+    """
+    encabezado = re.search(
+        r"(?im)^(?:#{0,6}\s*)?(?:\*\*)?\s*(?:referencias|references|références|referenzen|参考文献)\s*:?\s*(?:\*\*)?\s*$",
+        respuesta,
+    )
+    if not encabezado:
+        return respuesta
+
+    cuerpo = respuesta[:encabezado.start()]
+    citadas = {
+        int(n)
+        for n in re.findall(r"\[\s*(\d+)\s*\]", cuerpo)
+    }
+    cola = respuesta[encabezado.end():]
+    patron_entrada = re.compile(
+        r"(?m)^\s*(?:\*\*)?(?:\[(\d+)\]|(\d+)[.)])(?:\*\*)?\s*"
+    )
+    entradas = list(patron_entrada.finditer(cola))
+    if not entradas:
+        return respuesta
+
+    partes = []
+    inicio = 0
+    for indice, entrada in enumerate(entradas):
+        if entrada.start() > inicio:
+            partes.append(cola[inicio:entrada.start()])
+        siguiente = (
+            entradas[indice + 1].start()
+            if indice + 1 < len(entradas)
+            else len(cola)
+        )
+        numero = int(entrada.group(1) or entrada.group(2))
+        if numero in citadas:
+            partes.append(cola[entrada.start():siguiente])
+        inicio = siguiente
+    return cuerpo + respuesta[encabezado.start():encabezado.end()] + "".join(partes)
+
 _PATRONES_NEGACION_EVIDENCIA = [
     r"no encontr[ée] papers",
     r"no encontr[ée] evidencia",
