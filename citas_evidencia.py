@@ -112,7 +112,11 @@ def formatear_contexto_papers(papers, idioma="es"):
     """
     if not papers:
         return ""
-    texto = "📚 LITERATURA CIENTÍFICA DE PUBMED (ordenada por relevancia semántica):\n\n"
+    texto = (
+        "📚 LITERATURA CIENTÍFICA MULTIFUENTE (ordenada por relevancia semántica):\n\n"
+        "Criterio de agrupación: se seleccionaron por relevancia, recencia y disponibilidad "
+        "en las fuentes consultadas, no por coherencia temática.\n\n"
+    )
     for i, p in enumerate(papers, start=1):
         score = p.get("score")
         relevancia = f" (relevancia {score * 100:.0f}%)" if score is not None else ""
