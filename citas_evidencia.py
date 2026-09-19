@@ -159,10 +159,10 @@ def detectar_citas_en_respuesta(respuesta: str, n_papers: int, n_fragmentos: int
     """
     citas = set()
     for num in range(1, n_papers + 1):
-        if re.search(rf"\[\s*{num}\s*\]", respuesta):
+        if re.search(rf"(?:\[\s*{num}\s*\]|【\s*{num}\s*】)", respuesta):
             citas.add(("paper", num))
     for num in range(1, n_fragmentos + 1):
-        if re.search(rf"\[\s*F{num}\s*\]", respuesta, re.IGNORECASE):
+        if re.search(rf"(?:\[\s*F{num}\s*\]|【\s*F{num}\s*】)", respuesta, re.IGNORECASE):
             citas.add(("fragmento", num))
     return citas
 
@@ -176,7 +176,7 @@ def detectar_citas_alucinadas(respuesta: str, n_papers: int, n_fragmentos: int) 
     """
     if n_papers > 0 or n_fragmentos > 0:
         return False
-    return bool(re.search(r"\[\s*F?\d+\s*\]", respuesta))
+    return bool(re.search(r"(?:\[\s*F?\d+\s*\]|【\s*F?\d+\s*】)", respuesta))
 
 def detectar_citas_fuera_de_rango(respuesta: str, n_papers: int, n_fragmentos: int) -> dict:
     """
@@ -193,8 +193,24 @@ def detectar_citas_fuera_de_rango(respuesta: str, n_papers: int, n_fragmentos: i
     Devuelve {"papers_invalidos": [...], "fragmentos_invalidos": [...]}
     (listas vacías si todas las citas son válidas).
     """
-    papers_citados = {int(n) for n in re.findall(r"\[\s*(\d+)\s*\]", respuesta)}
-    fragmentos_citados = {int(n) for n in re.findall(r"\[\s*F(\d+)\s*\]", respuesta, re.IGNORECASE)}
+    papers_citados = {
+        int(grupo)
+        for coincidencia in re.findall(
+            r"(?:\[\s*(\d+)\s*\]|【\s*(\d+)\s*】)", respuesta
+        )
+        for grupo in coincidencia
+        if grupo
+    }
+    fragmentos_citados = {
+        int(grupo)
+        for coincidencia in re.findall(
+            r"(?:\[\s*F(\d+)\s*\]|【\s*F(\d+)\s*】)",
+            respuesta,
+            re.IGNORECASE,
+        )
+        for grupo in coincidencia
+        if grupo
+    }
     return {
         "papers_invalidos": sorted(n for n in papers_citados if n < 1 or n > n_papers),
         "fragmentos_invalidos": sorted(n for n in fragmentos_citados if n < 1 or n > n_fragmentos),
@@ -216,8 +232,12 @@ def eliminar_referencias_no_citadas(respuesta: str) -> str:
 
     cuerpo = respuesta[:encabezado.start()]
     citadas = {
-        int(n)
-        for n in re.findall(r"\[\s*(\d+)\s*\]", cuerpo)
+        int(grupo)
+        for coincidencia in re.findall(
+            r"(?:\[\s*(\d+)\s*\]|【\s*(\d+)\s*】)", cuerpo
+        )
+        for grupo in coincidencia
+        if grupo
     }
     cola = respuesta[encabezado.end():]
     patron_entrada = re.compile(
