@@ -25,6 +25,21 @@ from database import DB_PATH
 from rag_embeddings import generar_embedding
 
 
+_NOMBRES_REVISTA_CONOCIDOS = {
+    "ca cancer j clin": "CA: A Cancer Journal for Clinicians",
+    "ca": "CA: A Cancer Journal for Clinicians",
+    "pak j pharm sci": "Pakistan Journal of Pharmaceutical Sciences",
+    "pakistan j pharm sci": "Pakistan Journal of Pharmaceutical Sciences",
+}
+
+
+def _normalizar_nombre_revista(nombre):
+    """Expande solo abreviaturas conocidas; no infiere nombres nuevos."""
+    if not nombre:
+        return None
+    return _NOMBRES_REVISTA_CONOCIDOS.get(nombre.strip().lower(), nombre.strip())
+
+
 def _parsear_json_juez(texto: str):
     """
     Extrae el primer bloque {...} de un texto y lo parsea como JSON.
@@ -82,7 +97,11 @@ def parsear_articulo_pubmed(articulo):
             autores.append({"apellido": apellido, "iniciales": iniciales})
 
     revista_elem = articulo.find('.//Journal/Title')
-    revista = revista_elem.text.strip() if revista_elem is not None and revista_elem.text else None
+    revista = (
+        _normalizar_nombre_revista(revista_elem.text)
+        if revista_elem is not None and revista_elem.text
+        else None
+    )
 
     anio = None
     anio_elem = articulo.find('.//PubDate/Year')
@@ -839,6 +858,7 @@ def _calcular_estado_busqueda(
     else:
         estado = ESTADO_BUSQUEDA_OK
 
+    # Calcular confianza de la búsqueda
     if not hay_papers:
         confianza_busqueda = "baja"
     elif consultas_con_resultados <= 1:
@@ -1100,7 +1120,7 @@ def parsear_resultado_europepmc(item: dict):
         "titulo": titulo,
         "resumen": (item.get("abstractText") or "").strip(),
         "autores": _parsear_autores_europepmc(item.get("authorString", "")),
-        "revista": (item.get("journalTitle") or "").strip() or None,
+        "revista": _normalizar_nombre_revista(item.get("journalTitle")),
         "anio": str(item.get("pubYear") or "").strip() or None,
         "volumen": (item.get("journalVolume") or "").strip() or None,
         "numero": (item.get("issue") or "").strip() or None,
@@ -1218,7 +1238,9 @@ def parsear_resultado_semantic_scholar(item: dict):
         "titulo": titulo,
         "resumen": (item.get("abstract") or "").strip(),
         "autores": _parsear_autores_semantic_scholar(item.get("authors", [])),
-        "revista": (item.get("venue") or journal.get("name") or "").strip() or None,
+        "revista": _normalizar_nombre_revista(
+            journal.get("name") or item.get("venue")
+        ),
         "anio": str(item.get("year") or "").strip() or None,
         "volumen": (journal.get("volume") or "").strip() or None,
         "numero": None,
