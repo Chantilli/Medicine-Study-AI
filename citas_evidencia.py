@@ -120,7 +120,11 @@ def formatear_contexto_papers(papers, idioma="es"):
     for i, p in enumerate(papers, start=1):
         score = p.get("score")
         relevancia = f" (relevancia {score * 100:.0f}%)" if score is not None else ""
-        texto += f"[{i}]{relevancia}\n"
+        texto += (
+            f"[{i}]{relevancia}\n"
+            f"ID DE REFERENCIA INMUTABLE: [{i}] — usa exactamente este número; "
+            "no renumeres ni reordenes las referencias.\n"
+        )
         texto += formatear_cita_vancouver(p) + "\n"
         texto += f"Revista (metadatos): {p.get('revista') or '[nombre no disponible en los metadatos]'}\n"
         texto += f"Fuente de recuperación: {p.get('fuente_bd') or 'PubMed'}\n"
