@@ -118,6 +118,13 @@ def formatear_contexto_papers(papers, idioma="es"):
         relevancia = f" (relevancia {score * 100:.0f}%)" if score is not None else ""
         texto += f"[{i}]{relevancia}\n"
         texto += formatear_cita_vancouver(p) + "\n"
+        texto += f"Revista (metadatos): {p.get('revista') or '[nombre no disponible en los metadatos]'}\n"
+        texto += f"Fuente de recuperación: {p.get('fuente_bd') or 'PubMed'}\n"
+        if "desolation" in (p.get("titulo") or "").lower():
+            texto += (
+                "Nota del título: [posible artefacto de traducción en el título; "
+                "verificar contra el artículo original]\n"
+            )
         categoria = clasificar_evidencia(p.get("tipos_publicacion", []))
         texto += f"{t('nivel_evidencia', idioma)}: {t_categoria(categoria, idioma)}\n"
         identificadores = []
