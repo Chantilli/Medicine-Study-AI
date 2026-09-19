@@ -1120,6 +1120,17 @@ def buscar_europepmc(query: str, retmax: int = 10, rango_anios: tuple = None) ->
 
 SEMANTIC_SCHOLAR_BASE = "https://api.semanticscholar.org/graph/v1/paper/search"
 SEMANTIC_SCHOLAR_API_KEY = os.environ.get("SEMANTIC_SCHOLAR_API_KEY", "").strip()
+_lock_semantic_scholar = threading.Lock()
+_tiempo_ultima_llamada_semantic_scholar = [0.0]
+
+
+def _throttle_semantic_scholar():
+    """Garantiza al menos un segundo entre solicitudes al proveedor."""
+    with _lock_semantic_scholar:
+        transcurrido = time.time() - _tiempo_ultima_llamada_semantic_scholar[0]
+        if transcurrido < 1.0:
+            time.sleep(1.0 - transcurrido)
+        _tiempo_ultima_llamada_semantic_scholar[0] = time.time()
 
 _S2_TIPO_A_PUBMED = {
     "review": "Review",
@@ -1205,6 +1216,7 @@ def buscar_semantic_scholar(query: str, limit: int = 10, rango_anios: tuple = No
         if rango_anios:
             parametros += f"&year={rango_anios[0]}-{rango_anios[1]}"
         url = f"{SEMANTIC_SCHOLAR_BASE}{parametros}"
+        _throttle_semantic_scholar()
         headers = {"User-Agent": "Mozilla/5.0"}
         if SEMANTIC_SCHOLAR_API_KEY:
             headers["x-api-key"] = SEMANTIC_SCHOLAR_API_KEY
