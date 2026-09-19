@@ -8,8 +8,9 @@ import flet as ft
 
 from pubmed_search import clasificar_evidencia
 from citas_evidencia import formatear_cita_vancouver
+from traducciones import t, t_categoria
 
-def agregar_papers_a_chat(chat_view, page, papers, n_nuevos, total_unicos):
+def agregar_papers_a_chat(chat_view, page, papers, n_nuevos, total_unicos, idioma="es"):
     """
     Añade al chat la tarjeta visual de papers con enlaces clicables a DOI
     y PubMed, y el nivel de evidencia de cada uno. Las tarjetas son
@@ -52,7 +53,7 @@ def agregar_papers_a_chat(chat_view, page, papers, n_nuevos, total_unicos):
         controles_tarjeta.append(
             ft.Container(
                 content=ft.Text(
-                    clasificar_evidencia(p.get("tipos_publicacion", [])),
+                    t_categoria(clasificar_evidencia(p.get("tipos_publicacion", [])), idioma),
                     color="#a78bfa", size=11, weight=ft.FontWeight.W_600,
                 ),
                 bgcolor="#2a2140", border_radius=4, padding=ft.Padding(6, 2, 6, 2),
@@ -89,7 +90,7 @@ def agregar_papers_a_chat(chat_view, page, papers, n_nuevos, total_unicos):
         chat_view.scroll_to(key="end")
     page.update()
 
-def construir_panel_fuentes(fuentes: list):
+def construir_panel_fuentes(fuentes: list, idioma="es"):
     """
     Panel plegable "📚 Fuentes de esta respuesta (N)" con trazabilidad:
     cada fuente muestra si el modelo la citó explícitamente ([n]/[Fn]) o
@@ -115,7 +116,12 @@ def construir_panel_fuentes(fuentes: list):
                 ft.Container(
                     content=ft.Column([
                         ft.Text(f"[{f['indice']}] {f.get('titulo', '')}", size=12, weight=ft.FontWeight.BOLD, color="#e2e8f0"),
-                        ft.Text(f"{f.get('nivel_evidencia', '')} · {' | '.join(identificadores)}", size=11, color="#94a3b8"),
+                        ft.Text(
+                            f"{t('nivel_evidencia', idioma)}: "
+                            f"{t_categoria(f.get('nivel_evidencia', ''), idioma)} · "
+                            f"{' | '.join(identificadores)}",
+                            size=11, color="#94a3b8",
+                        ),
                         ft.Text(etiqueta, size=11, color=color_etiqueta, italic=True),
                     ], spacing=2),
                     padding=ft.Padding(0, 4, 0, 4),
