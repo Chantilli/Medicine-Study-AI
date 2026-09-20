@@ -29,6 +29,7 @@ from citas_evidencia import (
     eliminar_referencias_no_citadas, sincronizar_referencias_con_papers,
     eliminar_referencias_huerfanas_por_id,
     revisar_respuesta_con_ia,
+    auditar_contradicciones_evidencia,
     evaluar_factualidad, resumen_evidencia_citada,
 )
 
@@ -860,6 +861,11 @@ def main(page: ft.Page):
                     contexto_pubmed, bloque_pdf
                 )
                 full_response = revisar_respuesta_con_ia(
+                    full_response,
+                    contexto_revision,
+                    idioma_var[0],
+                )
+                full_response = auditar_contradicciones_evidencia(
                     full_response,
                     contexto_revision,
                     idioma_var[0],
