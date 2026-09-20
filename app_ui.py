@@ -27,6 +27,7 @@ from citas_evidencia import (
     verificar_consistencia_fisiologica, construir_lista_fuentes, construir_contexto_para_juez,
     eliminar_referencias_no_citadas, sincronizar_referencias_con_papers,
     revisar_respuesta_con_ia,
+    normalizar_citas_pmid,
     evaluar_factualidad, resumen_evidencia_citada,
 )
 from ui_helpers import agregar_papers_a_chat, construir_panel_fuentes, anexar_badge_factualidad
@@ -815,6 +816,10 @@ def main(page: ft.Page):
                     full_response,
                     contexto_revision,
                     idioma_var[0],
+                )
+                full_response = normalizar_citas_pmid(
+                    full_response,
+                    papers_relevantes,
                 )
                 full_response_limpio = sincronizar_referencias_con_papers(
                     full_response,
