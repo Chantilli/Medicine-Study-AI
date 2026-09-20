@@ -307,6 +307,56 @@ def sincronizar_referencias_con_papers(
     bloque = "\n".join(referencias)
     return cuerpo.rstrip() + "\n\n" + bloque + "\n"
 
+
+def revisar_respuesta_con_ia(
+    respuesta: str, contexto: str, idioma: str = "es"
+) -> str:
+    """Hace una pasada final dedicada exclusivamente a fidelidad y citas."""
+    if not client or not contexto.strip() or not respuesta.strip():
+        return respuesta
+    prompt = f"""
+Eres un revisor estricto de respuestas médicas educativas.
+Corrige la respuesta BORRADOR usando únicamente el CONTEXTO DE FUENTES.
+
+Reglas obligatorias:
+1. Los únicos IDs válidos son los que aparecen literalmente como
+   "ID DE REFERENCIA INMUTABLE: [n]" en el contexto. Nunca inventes, desplaces
+   ni renumeres un ID. Si una cita no corresponde a un ID real, elimínala.
+2. Cada cita [n] o 【n】 debe respaldar el claim exacto que acompaña. Si no está
+   respaldado por el resumen o el material proporcionado, elimina la cita y
+   reformula el claim como conocimiento general sin atribuirlo a esa fuente, o
+   elimínalo si no es necesario.
+3. No agregues hechos, cifras, mecanismos ni referencias que no estén en el
+   contexto. No uses memoria externa.
+4. Conserva la estructura y el idioma del borrador ({idioma}), pero devuelve
+   únicamente la respuesta corregida, sin comentarios sobre la revisión.
+5. No escribas una sección de referencias. El sistema la reconstruirá desde
+   los IDs citados después de esta pasada.
+
+CONTEXTO DE FUENTES:
+{contexto}
+
+BORRADOR:
+{respuesta}
+"""
+    try:
+        resultado = client.chat.completions.create(
+            model=MODELO_JUEZ,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Verifica cada cita de forma literal y sé conservador.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.0,
+            max_tokens=MAX_TOKENS_JUEZ,
+        )
+        corregida = resultado.choices[0].message.content
+        return corregida.strip() if corregida and corregida.strip() else respuesta
+    except Exception:
+        return respuesta
+
 _PATRONES_NEGACION_EVIDENCIA = [
     r"no encontr[ée] papers",
     r"no encontr[ée] evidencia",
