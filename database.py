@@ -1,7 +1,7 @@
 """
 Base de datos local (SQLite): esquema, migraciones, cuentas de usuario y
-CRUD de chats. DB_PATH se define aquí y lo importan los demás módulos
-que también tocan la misma base (fragmentos, papers).
+CRUD de chats. DB_PATH se define aquÃ­ y lo importan los demÃ¡s mÃ³dulos
+que tambiÃ©n tocan la misma base (fragmentos, papers).
 """
 import json
 import sqlite3
@@ -11,8 +11,16 @@ import bcrypt
 
 DB_PATH = Path(__file__).parent / "historial_chats.db"
 
+def obtener_conexion_db():
+    """Abre SQLite con espera y WAL para soportar peticiones concurrentes."""
+    conn = sqlite3.connect(DB_PATH, timeout=20.0)
+    conn.execute("PRAGMA busy_timeout=20000")
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
+
+
 def inicializar_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = obtener_conexion_db()
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
@@ -63,7 +71,7 @@ def inicializar_db():
             paginas TEXT,
             resumen TEXT,
             tipos_publicacion TEXT, -- JSON: ["Randomized Controlled Trial", ...]
-            vector BLOB,           -- embedding del título+resumen
+            vector BLOB,           -- embedding del tÃ­tulo+resumen
             fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(usuario_id, pmid),
             UNIQUE(usuario_id, doi)
@@ -94,8 +102,8 @@ def inicializar_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             usuario_id INTEGER NOT NULL,
             pregunta TEXT NOT NULL,
-            opciones TEXT NOT NULL,          -- JSON: ["opción A", "opción B", ...]
-            respuesta_correcta INTEGER NOT NULL,  -- índice (0-based) en opciones
+            opciones TEXT NOT NULL,          -- JSON: ["opciÃ³n A", "opciÃ³n B", ...]
+            respuesta_correcta INTEGER NOT NULL,  -- Ã­ndice (0-based) en opciones
             explicacion TEXT,
             tema TEXT,
             fuente TEXT,
@@ -191,7 +199,7 @@ def verificar_password(password: str, password_hash: str) -> bool:
 
 def crear_usuario(usuario: str, password: str):
     """Crea una cuenta nueva. Devuelve (usuario_id, error)."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = obtener_conexion_db()
     cursor = conn.cursor()
     try:
         cursor.execute(
@@ -201,7 +209,7 @@ def crear_usuario(usuario: str, password: str):
         conn.commit()
         return cursor.lastrowid, None
     except sqlite3.IntegrityError:
-        return None, "Ese nombre de usuario ya está en uso."
+        return None, "Ese nombre de usuario ya estÃ¡ en uso."
     except Exception as e:
         return None, f"No se pudo crear la cuenta: {e}"
     finally:
@@ -209,7 +217,7 @@ def crear_usuario(usuario: str, password: str):
 
 def obtener_usuario_por_nombre(usuario: str):
     """Devuelve (id, password_hash) o None si no existe."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = obtener_conexion_db()
     cursor = conn.cursor()
     cursor.execute("SELECT id, password_hash FROM usuarios WHERE usuario = ?", (usuario,))
     fila = cursor.fetchone()
@@ -218,7 +226,7 @@ def obtener_usuario_por_nombre(usuario: str):
 
 
 def guardar_chat_db(chat_id, titulo, mensajes, usuario_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = obtener_conexion_db()
     cursor = conn.cursor()
     cursor.execute(
         "INSERT OR REPLACE INTO chats (id, usuario_id, titulo, mensajes) VALUES (?, ?, ?, ?)",
@@ -228,7 +236,7 @@ def guardar_chat_db(chat_id, titulo, mensajes, usuario_id):
     conn.close()
 
 def obtener_todos_los_chats(usuario_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = obtener_conexion_db()
     cursor = conn.cursor()
     cursor.execute(
         "SELECT id, titulo FROM chats WHERE usuario_id = ? ORDER BY fecha DESC",
@@ -239,7 +247,7 @@ def obtener_todos_los_chats(usuario_id):
     return filas
 
 def obtener_mensajes_chat(chat_id, usuario_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = obtener_conexion_db()
     cursor = conn.cursor()
     cursor.execute(
         "SELECT mensajes FROM chats WHERE id = ? AND usuario_id = ?",
@@ -252,7 +260,7 @@ def obtener_mensajes_chat(chat_id, usuario_id):
     return []
 
 def eliminar_chat_db(chat_id, usuario_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = obtener_conexion_db()
     cursor = conn.cursor()
     cursor.execute(
         "DELETE FROM chats WHERE id = ? AND usuario_id = ?",
@@ -262,3 +270,4 @@ def eliminar_chat_db(chat_id, usuario_id):
     conn.close()
 
 inicializar_db()
+
