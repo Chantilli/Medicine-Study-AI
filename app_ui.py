@@ -26,6 +26,7 @@ from citas_evidencia import (
     detectar_negacion_contradictoria, limpiar_negacion_contradictoria,
     verificar_consistencia_fisiologica, construir_lista_fuentes, construir_contexto_para_juez,
     eliminar_referencias_no_citadas, sincronizar_referencias_con_papers,
+    revisar_respuesta_con_ia,
     evaluar_factualidad, resumen_evidencia_citada,
 )
 from ui_helpers import agregar_papers_a_chat, construir_panel_fuentes, anexar_badge_factualidad
@@ -777,7 +778,7 @@ def main(page: ft.Page):
                 response_stream = client.chat.completions.create(
                     model=MODELO_CHAT,
                     messages=mensajes_para_groq,
-                    temperature=0.2,
+                    temperature=0.0,
                     stream=True
                 )
                 fila_respuesta, ai_markdown = _burbuja_ai("", pregunta=texto)
@@ -806,6 +807,14 @@ def main(page: ft.Page):
                         tipo="error",
                     ))
 
+                contexto_revision = construir_contexto_para_juez(
+                    contexto_pubmed, bloque_pdf
+                )
+                full_response = revisar_respuesta_con_ia(
+                    full_response,
+                    contexto_revision,
+                    idioma_var[0],
+                )
                 full_response_limpio = sincronizar_referencias_con_papers(
                     full_response,
                     papers_relevantes,
