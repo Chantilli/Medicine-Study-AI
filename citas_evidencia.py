@@ -63,6 +63,15 @@ def formatear_cita_vancouver(p):
         piezas.append(f"doi: {p['doi']}")
     return " ".join(piezas).strip()
 
+
+def identificador_cita(p):
+    """Devuelve el identificador estable que el modelo debe citar."""
+    if p.get("pmid"):
+        return f"PMID:{p['pmid']}"
+    if p.get("doi"):
+        return f"DOI:{p['doi']}"
+    return ""
+
 def formatear_cita_apa(p):
     """
     Cita en formato APA 7. Ej.: 'Kahn, S. E., Cooper, M. E., & Del Prato,
@@ -121,8 +130,8 @@ def formatear_contexto_papers(papers, idioma="es"):
         score = p.get("score")
         relevancia = f" (relevancia {score * 100:.0f}%)" if score is not None else ""
         texto += (
-            f"[PMID:{p.get('pmid') or 'no_disponible'}]{relevancia}\n"
-            f"ID DE REFERENCIA INMUTABLE: [PMID:{p.get('pmid') or 'no_disponible'}] — "
+            f"[{identificador_cita(p) or 'ID_NO_DISPONIBLE'}]{relevancia}\n"
+            f"ID DE REFERENCIA INMUTABLE: [{identificador_cita(p) or 'ID_NO_DISPONIBLE'}] — "
             "usa exactamente este ID; no renumeres ni reordenes las referencias. Solo inclúyela en la lista final "
             "si la citas explícitamente en el cuerpo.\n"
         )
@@ -151,20 +160,31 @@ def formatear_contexto_papers(papers, idioma="es"):
 
 _PATRON_CITA_PAPER = r"(?:\[\s*(?:REF_)?(\d+)\s*\]|【\s*(?:REF_)?(\d+)\s*†?\s*】)"
 _PATRON_CITA_PMID = r"(?:\[\s*PMID\s*:\s*(\d+)\s*\]|【\s*PMID\s*:\s*(\d+)\s*†?\s*】)"
+_PATRON_CITA_DOI = r"(?:\[\s*DOI\s*:\s*([^\]\】\s]+)\s*\]|【\s*DOI\s*:\s*([^\]\】\s]+)\s*†?\s*】)"
 
 
 def normalizar_citas_pmid(respuesta: str, papers: list) -> str:
     """Convierte citas PMID verificables a IDs internos, sin renumeración del modelo."""
-    pmid_a_indice = {
+    identificador_a_indice = {
         str(p.get("pmid")): i
         for i, p in enumerate(papers, start=1)
         if p.get("pmid")
     }
+    identificador_a_indice.update({
+        f"DOI:{str(p.get('doi')).lower()}": i
+        for i, p in enumerate(papers, start=1)
+        if p.get("doi")
+    })
     def reemplazar(match):
         pmid = match.group(1) or match.group(2)
-        indice = pmid_a_indice.get(pmid)
+        indice = identificador_a_indice.get(pmid)
         return f"[REF_{indice}]" if indice else ""
-    return re.sub(_PATRON_CITA_PMID, reemplazar, respuesta, flags=re.IGNORECASE)
+    respuesta = re.sub(_PATRON_CITA_PMID, reemplazar, respuesta, flags=re.IGNORECASE)
+    def reemplazar_doi(match):
+        doi = f"DOI:{(match.group(1) or match.group(2)).lower()}"
+        indice = identificador_a_indice.get(doi)
+        return f"[REF_{indice}]" if indice else ""
+    return re.sub(_PATRON_CITA_DOI, reemplazar_doi, respuesta, flags=re.IGNORECASE)
 
 
 def _ids_papers_citados(respuesta: str) -> set:
@@ -346,9 +366,9 @@ Corrige la respuesta BORRADOR usando únicamente el CONTEXTO DE FUENTES.
 
 Reglas obligatorias:
 1. Los únicos IDs válidos son los que aparecen literalmente como
-   "ID DE REFERENCIA INMUTABLE: [PMID:...]" en el contexto. Cita exclusivamente
-   usando ese PMID completo, por ejemplo [PMID:34765042]. Nunca inventes PMIDs,
-   los trunques ni los sustituyas por números secuenciales.
+   "ID DE REFERENCIA INMUTABLE: [PMID:...]" o "[DOI:...]" en el contexto.
+   Cita exclusivamente usando ese identificador completo. Nunca inventes,
+   trunques ni sustituyas identificadores por números secuenciales.
 2. Cada cita [PMID:...] debe respaldar el claim exacto que acompaña. Si no está
    respaldado por el resumen o el material proporcionado, elimina la cita y
    reformula el claim como conocimiento general sin atribuirlo a esa fuente, o
