@@ -36,6 +36,14 @@ _REVISTAS_POR_DOI = {
     "10.36721/pjps": "Pakistan Journal of Pharmaceutical Sciences",
     "10.32687/0869-866x": "Problemy Meditsinskoy Biologii i Ekologii",
 }
+_PLACEHOLDERS_TITULO = frozenset({
+    "", "[not available]", "not available", "[not available in metadata]",
+    "sin título", "untitled", "n/a", "na",
+})
+_REVISTAS_NO_VERIFICADAS = frozenset({
+    "journal of media critiques",
+    "lumen et virtus",
+})
 
 
 def _normalizar_nombre_revista(nombre, doi=None):
@@ -50,6 +58,20 @@ def _resolver_revista(nombre, doi):
     """Usa metadata del proveedor y un fallback DOI verificado."""
     normalizada = _normalizar_nombre_revista(nombre, doi)
     return normalizada or _REVISTAS_POR_DOI.get(_normalizar_doi(doi))
+
+
+def _titulo_valido(titulo):
+    return (titulo or "").strip().lower() not in _PLACEHOLDERS_TITULO
+
+
+def _calidad_revista(nombre, fuente_bd=None, pmid=None):
+    """Clasifica conservadoramente la revista; no inventa métricas de impacto."""
+    revista = (nombre or "").strip().lower()
+    if revista in _REVISTAS_NO_VERIFICADAS:
+        return "no_verificada"
+    if fuente_bd == "Semantic Scholar" and not pmid:
+        return "no_verificada"
+    return "no_evaluada"
 
 
 def _parsear_json_juez(texto: str):
@@ -87,7 +109,7 @@ def parsear_articulo_pubmed(articulo):
     pmid = pmid_elem.text.strip() if pmid_elem is not None and pmid_elem.text else None
 
     titulo_elem = articulo.find('.//ArticleTitle')
-    titulo = " ".join(titulo_elem.itertext()).strip() if titulo_elem is not None else "Sin título"
+    titulo = " ".join(titulo_elem.itertext()).strip() if titulo_elem is not None else ""
 
     partes_resumen = []
     for bloque in articulo.findall('.//AbstractText'):
@@ -164,6 +186,7 @@ def parsear_articulo_pubmed(articulo):
         "paginas": paginas,
         "doi": doi,
         "tipos_publicacion": tipos_publicacion,
+        "calidad_revista": _calidad_revista(revista, "PubMed", pmid),
     }
 
 
@@ -282,6 +305,8 @@ def _penalizacion_fuente(paper):
         penalizacion += 0.08
     if paper.get("fuente_bd") == "Semantic Scholar":
         penalizacion += 0.04
+    if paper.get("calidad_revista") == "no_verificada":
+        penalizacion += 0.12
     if not paper.get("pmid") and not paper.get("doi"):
         penalizacion += 0.10
     return penalizacion
@@ -1115,7 +1140,7 @@ def parsear_resultado_europepmc(item: dict):
     Devuelve None si no trae ni título.
     """
     titulo = (item.get("title") or "").strip()
-    if not titulo:
+    if not _titulo_valido(titulo):
         return None
 
     tipos_crudos = list((item.get("pubTypeList") or {}).get("pubType", []))
@@ -1142,6 +1167,10 @@ def parsear_resultado_europepmc(item: dict):
         "paginas": (item.get("pageInfo") or "").strip() or None,
         "tipos_publicacion": tipos_publicacion,
         "fuente_bd": "Europe PMC",
+        "calidad_revista": _calidad_revista(
+            _resolver_revista(item.get("journalTitle"), item.get("doi")),
+            "Europe PMC", item.get("pmid"),
+        ),
     }
 
 
@@ -1276,9 +1305,9 @@ def parsear_resultado_semantic_scholar(item: dict):
     titulo = (item.get("title") or "").strip()
 
     external_ids = item.get("externalIds") or {}
-    if not titulo:
+    if not _titulo_valido(titulo):
         titulo = _titulo_crossref(external_ids.get("DOI"))
-    if not titulo:
+    if not _titulo_valido(titulo):
         return None
     journal = item.get("journal") or {}
     tipos_crudos = item.get("publicationTypes") or []
@@ -1288,36 +1317,42 @@ def parsear_resultado_semantic_scholar(item: dict):
         if t.strip().lower() in _S2_TIPO_A_PUBMED
     ]
 
+    revista = _resolver_revista(
+        journal.get("name") or item.get("venue"),
+        external_ids.get("DOI"),
+    )
+    autores = _parsear_autores_semantic_scholar(item.get("authors", []))
+    if not autores and external_ids.get("DOI"):
+        autores = _metadatos_crossref_doi(external_ids["DOI"]).get("autores", [])
     return {
         "pmid": external_ids.get("PubMed") or None,
         "doi": external_ids.get("DOI") or None,
         "titulo": titulo,
         "resumen": (item.get("abstract") or "").strip(),
-        "autores": _parsear_autores_semantic_scholar(item.get("authors", [])),
-        "revista": _resolver_revista(
-            journal.get("name") or item.get("venue"),
-            external_ids.get("DOI"),
-        ),
+        "autores": autores,
+        "revista": revista,
         "anio": str(item.get("year") or "").strip() or None,
         "volumen": (journal.get("volume") or "").strip() or None,
         "numero": None,
         "paginas": (journal.get("pages") or "").strip() or None,
         "tipos_publicacion": tipos_publicacion,
         "fuente_bd": "Semantic Scholar",
+        "calidad_revista": _calidad_revista(revista, "Semantic Scholar", external_ids.get("PubMed")),
     }
 
 
-_titulos_crossref = {}
+_metadatos_crossref = {}
 
 
-def _titulo_crossref(doi: str) -> str:
-    """Obtiene el título faltante de Crossref usando el DOI, sin credenciales."""
+def _metadatos_crossref_doi(doi: str) -> dict:
+    """Obtiene título y autores de Crossref como respaldo de metadatos incompletos."""
     doi = (doi or "").strip()
     if not doi:
-        return ""
+        return {}
     clave = doi.lower()
-    if clave in _titulos_crossref:
-        return _titulos_crossref[clave]
+    if clave in _metadatos_crossref:
+        return _metadatos_crossref[clave]
+    resultado = {}
     try:
         url = "https://api.crossref.org/works/" + urllib.parse.quote(doi, safe="")
         req = urllib.request.Request(
@@ -1325,23 +1360,44 @@ def _titulo_crossref(doi: str) -> str:
             headers={"User-Agent": "MedicineStudyAI/1.0 (mailto:contact@example.com)"},
         )
         with urllib.request.urlopen(req, timeout=8) as respuesta:
-            datos = json.loads(respuesta.read().decode("utf-8"))
-        titulos = datos.get("message", {}).get("title") or []
-        titulo = str(titulos[0]).strip() if titulos else ""
+            mensaje = json.loads(respuesta.read().decode("utf-8")).get("message", {})
+        titulos = mensaje.get("title") or []
+        if titulos:
+            resultado["titulo"] = str(titulos[0]).strip()
+        autores = []
+        for autor in mensaje.get("author") or []:
+            apellido = (autor.get("family") or "").strip()
+            nombres = (autor.get("given") or "").strip()
+            if apellido:
+                iniciales = "".join(p[0].upper() for p in re.findall(r"[A-Za-zÀ-ÿ]+", nombres))
+                autores.append({"apellido": apellido, "iniciales": iniciales})
+        if autores:
+            resultado["autores"] = autores
     except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, ValueError, OSError):
-        titulo = ""
-    _titulos_crossref[clave] = titulo
-    return titulo
+        resultado = {}
+    _metadatos_crossref[clave] = resultado
+    return resultado
+
+
+def _titulo_crossref(doi: str) -> str:
+    """Obtiene el título faltante de Crossref usando el DOI, sin credenciales."""
+    doi = (doi or "").strip()
+    if not doi:
+        return ""
+    return _metadatos_crossref_doi(doi).get("titulo", "")
 
 
 def enriquecer_titulos_por_doi(papers: list) -> list:
-    """Rellena títulos vacíos o placeholders mediante Crossref."""
+    """Rellena títulos y autores faltantes mediante Crossref."""
     for paper in papers:
         titulo = (paper.get("titulo") or "").strip()
-        if not titulo or titulo.lower() in {"[not available]", "not available", "sin título"}:
-            titulo_crossref = _titulo_crossref(paper.get("doi"))
-            if titulo_crossref:
-                paper["titulo"] = titulo_crossref
+        metadatos = {}
+        if not _titulo_valido(titulo) or not paper.get("autores"):
+            metadatos = _metadatos_crossref_doi(paper.get("doi"))
+        if not _titulo_valido(titulo) and metadatos.get("titulo"):
+            paper["titulo"] = metadatos["titulo"]
+        if not paper.get("autores") and metadatos.get("autores"):
+            paper["autores"] = metadatos["autores"]
     return papers
 
 
