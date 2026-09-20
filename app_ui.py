@@ -113,7 +113,9 @@ def main(page: ft.Page):
     en_modo_repaso = [False]
 
     txt_estado_flashcards = ft.Text("", size=12, color="#a78bfa", italic=True)
-    txt_contador_flashcards = ft.Text("📇 Repasar (0 pendientes)", size=13, color="#e2e8f0")
+    txt_contador_flashcards = ft.Text(
+        t("repasar", IDIOMA_POR_DEFECTO, n=0), size=13, color="#e2e8f0"
+    )
 
     
     examen_sesion = []
@@ -179,7 +181,7 @@ def main(page: ft.Page):
             acciones.append(
                 ft.IconButton(
                     icon=ft.Icons.EDIT_OUTLINED, icon_size=14, icon_color="#64748b",
-                    tooltip="Editar y reenviar", on_click=click_editar,
+                    tooltip=t("editar_reenviar", idioma_var[0]), on_click=click_editar,
                     style=ft.ButtonStyle(padding=4),
                 )
             )
@@ -423,7 +425,7 @@ def main(page: ft.Page):
         if not archivos:
             return
 
-        txt_estado_pdf.value = "⏳ Transfiriendo archivo..."
+        txt_estado_pdf.value = t("archivo_transferencia", idioma_var[0])
         page.update()
 
         archivo = archivos[0]
@@ -440,16 +442,16 @@ def main(page: ft.Page):
 
         error_subida = getattr(e, "error", None)
         if error_subida:
-            txt_estado_pdf.value = f"❌ Error al subir el archivo: {error_subida}"
+            txt_estado_pdf.value = t("pdf_error_subida", idioma_var[0], error=error_subida)
             page.update()
             return
 
-        txt_estado_pdf.value = "⏳ Procesando y extrayendo texto del PDF..."
+        txt_estado_pdf.value = t("pdf_procesando", idioma_var[0])
         page.update()
         try:
             nombre_archivo = getattr(e, "file_name", None) or getattr(e, "name", None)
             if not nombre_archivo:
-                txt_estado_pdf.value = "❌ Archivo no identificado"
+                txt_estado_pdf.value = t("pdf_no_identificado", idioma_var[0])
                 page.update()
                 return
 
@@ -473,21 +475,25 @@ def main(page: ft.Page):
                 if n_fragmentos > 0:
                     if resultado_extraccion["via_ocr"]:
                         n_paginas_ocr = len(resultado_extraccion["paginas_ocreadas"])
-                        txt_estado_pdf.value = (
-                            f"✅ PDF indexado ({n_fragmentos} fragmentos, "
-                            f"{n_paginas_ocr} págs. vía OCR): {nombre_archivo[:18]}..."
+                        txt_estado_pdf.value = t(
+                            "pdf_indexado_ocr", idioma_var[0], n=n_fragmentos,
+                            n_ocr=n_paginas_ocr, nombre=nombre_archivo[:18],
                         )
                     else:
-                        txt_estado_pdf.value = f"✅ PDF indexado ({n_fragmentos} fragmentos): {nombre_archivo[:18]}..."
+                        txt_estado_pdf.value = t(
+                            "pdf_indexado", idioma_var[0], n=n_fragmentos,
+                            nombre=nombre_archivo[:18],
+                        )
                 else:
                     if not _disponible_ocr():
-                        txt_estado_pdf.value = "❌ No se pudo extraer texto (parece escaneado; el OCR no está disponible en este servidor)"
+                        txt_estado_pdf.value = t("pdf_sin_ocr", idioma_var[0])
                     else:
-                        txt_estado_pdf.value = "❌ No se pudo extraer texto del PDF, ni siquiera con OCR"
+                        txt_estado_pdf.value = t("pdf_sin_texto", idioma_var[0])
             else:
-               
                 fragmentos_sesion.append(texto_extraido[:MAX_CARACTERES_BLOQUE])
-                txt_estado_pdf.value = f"✅ PDF cargado (sin búsqueda semántica): {nombre_archivo[:18]}..."
+                txt_estado_pdf.value = t(
+                    "pdf_cargado", idioma_var[0], nombre=nombre_archivo[:18]
+                )
 
             
             if modelo_embeddings:
@@ -507,16 +513,23 @@ def main(page: ft.Page):
                         if guardar_fragmentos_pdf(usuario_actual_id[0], fuente_tabla, markdown_tabla, tipo_texto="tabla") > 0:
                             n_tablas_indexadas += 1
                     if n_tablas_indexadas > 0:
-                        txt_estado_pdf.value += f" · {n_tablas_indexadas} tabla(s) indexada(s)"
+                        txt_estado_pdf.value += t(
+                            "tablas_indexadas", idioma_var[0], n=n_tablas_indexadas
+                        )
 
-            chat_view.controls.append(ft.Text(f"📎 Has cargado el documento: {nombre_archivo}", color="#22c55e", size=13, italic=True))
+            chat_view.controls.append(ft.Text(
+                t("pdf_cargado_documento", idioma_var[0], nombre=nombre_archivo),
+                color="#22c55e", size=13, italic=True,
+            ))
 
             if ruta_final_archivo.exists():
                 os.remove(ruta_final_archivo)
 
         except Exception as ex:
-            txt_estado_pdf.value = "❌ Error al leer el PDF"
-            chat_view.controls.append(_tarjeta_aviso(f"❌ No se pudo procesar el PDF: {ex}", tipo="error"))
+            txt_estado_pdf.value = t("pdf_error_proceso", idioma_var[0])
+            chat_view.controls.append(_tarjeta_aviso(
+                t("pdf_no_procesado", idioma_var[0], error=ex), tipo="error"
+            ))
         page.update()
 
    
@@ -594,7 +607,7 @@ def main(page: ft.Page):
                             icon_size=16,
                             data=c_id,
                             on_click=abrir_modal_borrar,
-                            tooltip="Eliminar chat"
+                            tooltip=t("eliminar_chat", idioma_var[0])
                         )
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                     padding=ft.Padding(6, 2, 2, 2),
@@ -755,7 +768,7 @@ def main(page: ft.Page):
             try:
                 fragmentos_relevantes = buscar_fragmentos_relevantes(usuario_actual_id[0], texto)
                 if fragmentos_relevantes:
-                    bloque_pdf = "[FRAGMENTOS RELEVANTES DE TUS DOCUMENTOS, recuperados por búsqueda semántica]:\n"
+                    bloque_pdf = t("contexto_pdf", idioma_var[0]) + "\n"
                     for i, (similitud, fuente, frag_texto, tipo_texto) in enumerate(fragmentos_relevantes, start=1):
                         ocr_tag = " · vía OCR" if tipo_texto == "ocr" else ""
                         bloque_pdf += f"\n[F{i}] (Fuente: {fuente} | similitud: {similitud:.2f}{ocr_tag})\n{frag_texto}\n"
@@ -788,8 +801,19 @@ def main(page: ft.Page):
                                     fila_icd11,
                                     t("terminologia_icd11_verificada", idioma_var[0], n=len(glosario["terminos_encontrados"])),
                                 )
+                            elif glosario.get("estado") == "no_disponible":
+                                _completar_paso_proceso(
+                                    fila_icd11,
+                                    t("icd11_no_disponible", idioma_var[0], error=glosario.get("error") or ""),
+                                    error=True,
+                                )
                             else:
-                                _completar_paso_proceso(fila_icd11, t("icd11_sin_terminos", idioma_var[0]))
+                                clave_icd = (
+                                    "icd11_sin_coincidencias"
+                                    if glosario.get("estado") == "sin_coincidencias"
+                                    else "icd11_sin_terminos"
+                                )
+                                _completar_paso_proceso(fila_icd11, t(clave_icd, idioma_var[0]))
                         except Exception:
                             _completar_paso_proceso(fila_icd11, t("icd11_sin_terminos", idioma_var[0]), error=True)
 
@@ -828,11 +852,7 @@ def main(page: ft.Page):
 
                 if detectar_citas_alucinadas(full_response, len(papers_relevantes), len(fragmentos_relevantes)):
                     chat_view.controls.append(_tarjeta_aviso(
-                        "⚠️ Esta respuesta incluye referencias numeradas (ej. [1], [F1]) pero no "
-                        "se encontró ningún paper de PubMed ni fragmento de tus documentos para "
-                        "esta pregunta. Esas citas son probablemente inventadas por el modelo — "
-                        "no las tomes como evidencia real.",
-                        tipo="error",
+                        t("fuentes_sin_respuesta", idioma_var[0]), tipo="error"
                     ))
 
                 contexto_revision = construir_contexto_para_juez(
@@ -903,7 +923,7 @@ def main(page: ft.Page):
                 if contradicciones:
                     lineas_contradiccion = [
                         ft.Text(
-                            "🧬 Posible inconsistencia fisiológica detectada — revisa antes de confiar en este diagnóstico:",
+                            t("inconsistencia_fisiologica", idioma_var[0]),
                             color="#fbbf24", size=12, weight=ft.FontWeight.BOLD,
                         )
                     ]
@@ -952,7 +972,7 @@ def main(page: ft.Page):
                     ))
 
                 es_primer_mensaje = len(historial) <= 3
-                titulo_chat = "Consulta Médica"
+                titulo_chat = t("consulta_medica_default", idioma_var[0])
                 if es_primer_mensaje:
                     titulo_chat = generar_titulo_con_ia(texto, idioma=idioma_var[0])
                 else:
@@ -1620,7 +1640,7 @@ def main(page: ft.Page):
         page.update()
 
     entrada = ft.TextField(
-        hint_text="Pregunta algo sobre medicina o tu PDF...",
+        hint_text=t("entrada_hint", IDIOMA_POR_DEFECTO),
         expand=True,
         border_color="#1f212a",
         bgcolor="#16171d",
@@ -1809,7 +1829,10 @@ def main(page: ft.Page):
         except Exception as ex:
             print(f"[mostrar_app_principal] Error en mostrar_pantalla_bienvenida: {ex}")
             chat_view.controls.clear()
-            chat_view.controls.append(ft.Text(f"❌ Error cargando la pantalla principal: {ex}", color="#ef4444"))
+            chat_view.controls.append(ft.Text(
+                t("error_cargando_pantalla_principal", idioma_var[0], error=ex),
+                color="#ef4444",
+            ))
             page.update()
         try:
             actualizar_contador_flashcards()
@@ -1820,16 +1843,17 @@ def main(page: ft.Page):
     modo_registro = [False]
 
     campo_usuario_login = ft.TextField(
-        label="Usuario", width=300, border_color="#1f212a", bgcolor="#16171d", autofocus=True
+        label=t("login_usuario", idioma_var[0]), width=300,
+        border_color="#1f212a", bgcolor="#16171d", autofocus=True
     )
     campo_password_login = ft.TextField(
-        label="Contraseña", width=300, border_color="#1f212a", bgcolor="#16171d",
+        label=t("login_contrasena", idioma_var[0]), width=300, border_color="#1f212a", bgcolor="#16171d",
         password=True, can_reveal_password=True
     )
     texto_error_login = ft.Text("", color="#ef4444", size=12)
-    titulo_login = ft.Text("Iniciar sesión", size=22, weight=ft.FontWeight.BOLD, color="#f8fafc")
+    titulo_login = ft.Text(t("login_titulo", idioma_var[0]), size=22, weight=ft.FontWeight.BOLD, color="#f8fafc")
     texto_toggle_login = ft.Text(
-        "¿No tienes cuenta? Regístrate", color="#3b82f6", size=13
+        t("login_no_tienes_cuenta", idioma_var[0]), color="#3b82f6", size=13
     )
 
     def procesar_login(e):
@@ -1837,15 +1861,15 @@ def main(page: ft.Page):
         password = campo_password_login.value or ""
 
         if not usuario or not password:
-            texto_error_login.value = "Completa usuario y contraseña."
+            texto_error_login.value = t("login_completa", idioma_var[0])
             page.update()
             return
         if len(usuario) < 3:
-            texto_error_login.value = "El usuario debe tener al menos 3 caracteres."
+            texto_error_login.value = t("login_usuario_corto", idioma_var[0])
             page.update()
             return
         if len(password) < 4:
-            texto_error_login.value = "La contraseña debe tener al menos 4 caracteres."
+            texto_error_login.value = t("login_contrasena_corta", idioma_var[0])
             page.update()
             return
 
@@ -1860,7 +1884,7 @@ def main(page: ft.Page):
         else:
             fila = obtener_usuario_por_nombre(usuario)
             if not fila or not verificar_password(password, fila[1]):
-                texto_error_login.value = "Usuario o contraseña incorrectos."
+                texto_error_login.value = t("login_incorrecto", idioma_var[0])
                 page.update()
                 return
             usuario_actual_id[0] = fila[0]
@@ -1875,17 +1899,17 @@ def main(page: ft.Page):
         modo_registro[0] = not modo_registro[0]
         texto_error_login.value = ""
         if modo_registro[0]:
-            titulo_login.value = "Crear cuenta"
-            btn_login.text = "Crear cuenta"
-            texto_toggle_login.value = "¿Ya tienes cuenta? Inicia sesión"
+            titulo_login.value = t("login_crear", idioma_var[0])
+            btn_login.text = t("login_crear", idioma_var[0])
+            texto_toggle_login.value = t("login_tienes_cuenta", idioma_var[0])
         else:
-            titulo_login.value = "Iniciar sesión"
-            btn_login.text = "Iniciar sesión"
-            texto_toggle_login.value = "¿No tienes cuenta? Regístrate"
+            titulo_login.value = t("login_titulo", idioma_var[0])
+            btn_login.text = t("login_titulo", idioma_var[0])
+            texto_toggle_login.value = t("login_no_tienes_cuenta", idioma_var[0])
         page.update()
 
     btn_login = ft.FilledButton(
-        text="Iniciar sesión",
+        text=t("login_titulo", idioma_var[0]),
         width=300,
         style=ft.ButtonStyle(bgcolor="#3b82f6", shape=ft.RoundedRectangleBorder(radius=8)),
         on_click=procesar_login,
