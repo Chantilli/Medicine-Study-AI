@@ -52,7 +52,8 @@ MODELO_AUXILIAR = "openai/gpt-oss-20b"
 
 
 MODELO_JUEZ = "openai/gpt-oss-120b"
-MAX_TOKENS_JUEZ = 1500
+MAX_TOKENS_RESPUESTA = 4000
+MAX_TOKENS_JUEZ = 3000
 MAX_CHARS_EVAL_CONTEXTO = 8000
 
 UPLOAD_DIR = Path(__file__).parent / "uploads"
