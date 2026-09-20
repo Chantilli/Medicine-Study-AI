@@ -263,6 +263,50 @@ def eliminar_referencias_no_citadas(respuesta: str) -> str:
         inicio = siguiente
     return cuerpo + respuesta[encabezado.start():encabezado.end()] + "".join(partes)
 
+
+def sincronizar_referencias_con_papers(
+    respuesta: str, papers: list, idioma: str = "es"
+) -> str:
+    """
+    Hace determinista la correspondencia entre las citas del cuerpo y la
+    bibliografía final. El modelo puede redactar la sección, pero no puede
+    crear ni omitir la entrada de un paper que realmente citó.
+    """
+    encabezado = re.search(
+        r"(?im)^(?:#{0,6}\s*)?(?:\*\*)?\s*"
+        r"(?:referencias|references|références|referenzen|参考文献)"
+        r"\s*:?\s*(?:\*\*)?\s*$",
+        respuesta,
+    )
+    cuerpo = respuesta[:encabezado.start()] if encabezado else respuesta
+    citas = detectar_citas_fuera_de_rango(cuerpo, len(papers), 0)
+    invalidos = set(citas["papers_invalidos"])
+    if invalidos:
+        cuerpo = re.sub(
+            r"\s*(?:\[\s*(\d+)\s*\]|【\s*(\d+)\s*】)",
+            lambda m: "" if int(m.group(1) or m.group(2)) in invalidos else m.group(0),
+            cuerpo,
+        )
+
+    citados = detectar_citas_en_respuesta(cuerpo, len(papers), 0)
+    numeros = sorted(
+        numero for tipo, numero in citados if tipo == "paper"
+    )
+    if not numeros:
+        return cuerpo if encabezado else respuesta
+
+    palabra = {
+        "es": "Referencias",
+        "fr": "Références",
+        "de": "Referenzen",
+        "zh": "参考文献",
+    }.get(idioma, "References")
+    referencias = [f"**{palabra}**", ""]
+    for numero in numeros:
+        referencias.append(f"{numero}. {formatear_cita_vancouver(papers[numero - 1])}")
+    bloque = "\n".join(referencias)
+    return cuerpo.rstrip() + "\n\n" + bloque + "\n"
+
 _PATRONES_NEGACION_EVIDENCIA = [
     r"no encontr[ée] papers",
     r"no encontr[ée] evidencia",
