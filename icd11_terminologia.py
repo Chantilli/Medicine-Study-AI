@@ -35,6 +35,8 @@ TOKEN_URL = "https://icdaccessmanagement.who.int/connect/token"
 SEARCH_URL = "https://id.who.int/icd/release/11/2024-01/mms/search"
 
 _IDIOMA_A_ACCEPT_LANGUAGE = {"es": "es", "en": "en", "fr": "fr", "de": "de", "zh": "zh"}
+_IDIOMAS_SOPORTADOS = frozenset(_IDIOMA_A_ACCEPT_LANGUAGE)
+_SCORE_MINIMO = 0.20
 
 _PATRON_HTML = re.compile(r"<[^>]+>")
 
@@ -114,7 +116,8 @@ def buscar_termino_icd11(termino: str, idioma: str = "es", top_k: int = 5) -> di
             "error": "No se pudo obtener el token de ICD-11 (revisa ICD11_CLIENT_ID / ICD11_CLIENT_SECRET).",
         }
 
-    accept_language = _IDIOMA_A_ACCEPT_LANGUAGE.get(idioma, "en")
+    idioma = idioma if idioma in _IDIOMAS_SOPORTADOS else "es"
+    accept_language = _IDIOMA_A_ACCEPT_LANGUAGE[idioma]
     try:
         respuesta = requests.get(
             SEARCH_URL,
@@ -147,11 +150,15 @@ def buscar_termino_icd11(termino: str, idioma: str = "es", top_k: int = 5) -> di
     entidades = datos.get("destinationEntities") or []
     resultados = []
     for ent in entidades[:top_k]:
+        try:
+            score = float(ent.get("score", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            score = 0.0
         resultados.append({
             "titulo": _limpiar_html(ent.get("title", "")),
             "codigo": ent.get("theCode", ""),
             "uri": ent.get("id", ""),
-            "score": ent.get("score", 0.0),
+            "score": score,
         })
 
     return {"disponible": True, "resultados": resultados, "error": None}
@@ -217,36 +224,41 @@ def construir_glosario_icd11(pregunta: str, idioma: str = "es") -> dict:
     qué se verificó (transparencia, mismo principio que el panel de
     Fuentes con los papers de PubMed).
 
-    Devuelve {"bloque_contexto": str, "terminos_encontrados": [...]}.
+    Devuelve {"bloque_contexto": str, "terminos_encontrados": [...],
+    "estado": str, "error": str|None}.
     bloque_contexto es "" (y terminos_encontrados []) cuando:
-      - idioma es "en" (PubMed ya está en inglés, no hace falta glosario)
       - no se identificó ningún término médico en la pregunta
       - ICD-11 no está disponible (sin credenciales, sin conexión, etc.)
     Nunca lanza excepción — un fallo aquí nunca debe romper el resto del
     turno de chat, simplemente se sigue sin el glosario.
     """
-    if idioma == "en":
-        return {"bloque_contexto": "", "terminos_encontrados": []}
-
     terminos = _extraer_terminos_medicos(pregunta)
     if not terminos:
-        return {"bloque_contexto": "", "terminos_encontrados": []}
+        return {"bloque_contexto": "", "terminos_encontrados": [], "estado": "sin_terminos", "error": None}
 
     lineas = []
     encontrados = []
+    errores = []
     for termino in terminos:
         resultado = buscar_termino_icd11(termino, idioma=idioma, top_k=1)
         if resultado["disponible"] and resultado["resultados"]:
             top = resultado["resultados"][0]
-            if not top["titulo"]:
+            if not top["titulo"] or top.get("score", 0.0) < _SCORE_MINIMO:
                 continue
             lineas.append(f"- {termino} \u2192 \"{top['titulo']}\" (ICD-11 {top['codigo']})")
             encontrados.append({
                 "termino_buscado": termino, "titulo_oficial": top["titulo"], "codigo": top["codigo"],
             })
+        elif resultado.get("error"):
+            errores.append(resultado["error"])
 
     if not lineas:
-        return {"bloque_contexto": "", "terminos_encontrados": []}
+        return {
+            "bloque_contexto": "",
+            "terminos_encontrados": [],
+            "estado": "no_disponible" if errores else "sin_coincidencias",
+            "error": errores[0] if errores else None,
+        }
 
     bloque = (
         "[GLOSARIO DE TERMINOLOGÍA OFICIAL ICD-11 — usa estos términos EXACTOS, "
@@ -254,4 +266,9 @@ def construir_glosario_icd11(pregunta: str, idioma: str = "es") -> dict:
         "traducir tú mismo estos conceptos del inglés (evita falsos amigos y "
         "traducciones automáticas incorrectas)]:\n" + "\n".join(lineas)
     )
-    return {"bloque_contexto": bloque, "terminos_encontrados": encontrados}
+    return {
+        "bloque_contexto": bloque,
+        "terminos_encontrados": encontrados,
+        "estado": "ok",
+        "error": None,
+    }
