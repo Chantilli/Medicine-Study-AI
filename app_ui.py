@@ -6,6 +6,7 @@ módulos — este archivo solo arma la interfaz y conecta los eventos.
 """
 import os
 import time
+import re
 import flet as ft
 
 from config import client, modelo_embeddings, SYSTEM_PROMPT, UPLOAD_DIR, MAX_CARACTERES_BLOQUE, MODELO_CHAT, MODELO_AUXILIAR, MAX_TOKENS_RESPUESTA, construir_system_prompt, IDIOMAS, IDIOMA_POR_DEFECTO
@@ -27,9 +28,34 @@ from citas_evidencia import (
     verificar_consistencia_fisiologica, construir_lista_fuentes, construir_contexto_para_juez,
     eliminar_referencias_no_citadas, sincronizar_referencias_con_papers,
     revisar_respuesta_con_ia,
-    normalizar_citas_pmid,
     evaluar_factualidad, resumen_evidencia_citada,
 )
+
+try:
+    from citas_evidencia import normalizar_citas_pmid
+except ImportError as error:
+    if "normalizar_citas_pmid" not in str(error):
+        raise
+
+    def normalizar_citas_pmid(respuesta: str, papers: list) -> str:
+        """Compatibilidad con una copia antigua de citas_evidencia.py."""
+        pmid_a_indice = {
+            str(p.get("pmid")): i
+            for i, p in enumerate(papers, start=1)
+            if p.get("pmid")
+        }
+
+        def reemplazar(match):
+            pmid = match.group(1) or match.group(2)
+            indice = pmid_a_indice.get(pmid)
+            return f"[{indice}]" if indice else ""
+
+        return re.sub(
+            r"(?:\[\s*PMID\s*:\s*(\d+)\s*\]|【\s*PMID\s*:\s*(\d+)\s*†?\s*】)",
+            reemplazar,
+            respuesta,
+            flags=re.IGNORECASE,
+        )
 from ui_helpers import agregar_papers_a_chat, construir_panel_fuentes, anexar_badge_factualidad
 from historial_utils import recortar_historial, generar_titulo_con_ia
 from flashcards import (
