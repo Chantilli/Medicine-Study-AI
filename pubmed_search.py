@@ -8,6 +8,7 @@ multidisciplinaria), deduplicadas contra PubMed y entre sí por PMID/DOI
 normalizado.
 """
 import os
+import urllib.parse
 import json
 import re
 import time
@@ -483,7 +484,7 @@ _CATEGORIAS_EVIDENCIA = {
     "Clinical Trial, Phase III": "Evidencia primaria (ensayo clínico)",
     "Clinical Trial, Phase IV": "Evidencia primaria (ensayo clínico)",
     "Observational Study": "Evidencia primaria (observacional)",
-    "Comparative Study": "Sin clasificar",
+    "Comparative Study": "Sin clasificar",  
     "Case Reports": "Evidencia primaria (reporte de caso)",
     "Editorial": "Opinión/comentario",
     "Comment": "Opinión/comentario",
@@ -1010,6 +1011,7 @@ def buscar_pubmed_estructurado(consulta, usuario_id):
         elif not s2_ok:
             intentos_debug.append(f"Semantic Scholar ('{query_usada}') → error de proveedor")
 
+        enriquecer_titulos_por_doi(papers)
         proveedores = {
             "pubmed": estado_pubmed,
             "europepmc": "ok" if epmc_ok else "error",
@@ -1245,10 +1247,12 @@ def parsear_resultado_semantic_scholar(item: dict):
     Devuelve None si no trae ni título.
     """
     titulo = (item.get("title") or "").strip()
-    if not titulo:
-        return None
 
     external_ids = item.get("externalIds") or {}
+    if not titulo:
+        titulo = _titulo_crossref(external_ids.get("DOI"))
+    if not titulo:
+        return None
     journal = item.get("journal") or {}
     tipos_crudos = item.get("publicationTypes") or []
     tipos_publicacion = [
@@ -1274,6 +1278,44 @@ def parsear_resultado_semantic_scholar(item: dict):
         "tipos_publicacion": tipos_publicacion,
         "fuente_bd": "Semantic Scholar",
     }
+
+
+_titulos_crossref = {}
+
+
+def _titulo_crossref(doi: str) -> str:
+    """Obtiene el título faltante de Crossref usando el DOI, sin credenciales."""
+    doi = (doi or "").strip()
+    if not doi:
+        return ""
+    clave = doi.lower()
+    if clave in _titulos_crossref:
+        return _titulos_crossref[clave]
+    try:
+        url = "https://api.crossref.org/works/" + urllib.parse.quote(doi, safe="")
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "MedicineStudyAI/1.0 (mailto:contact@example.com)"},
+        )
+        with urllib.request.urlopen(req, timeout=8) as respuesta:
+            datos = json.loads(respuesta.read().decode("utf-8"))
+        titulos = datos.get("message", {}).get("title") or []
+        titulo = str(titulos[0]).strip() if titulos else ""
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, ValueError, OSError):
+        titulo = ""
+    _titulos_crossref[clave] = titulo
+    return titulo
+
+
+def enriquecer_titulos_por_doi(papers: list) -> list:
+    """Rellena títulos vacíos o placeholders mediante Crossref."""
+    for paper in papers:
+        titulo = (paper.get("titulo") or "").strip()
+        if not titulo or titulo.lower() in {"[not available]", "not available", "sin título"}:
+            titulo_crossref = _titulo_crossref(paper.get("doi"))
+            if titulo_crossref:
+                paper["titulo"] = titulo_crossref
+    return papers
 
 
 def buscar_semantic_scholar(query: str, limit: int = 10, rango_anios: tuple = None) -> tuple:
