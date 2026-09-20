@@ -8,7 +8,7 @@ import os
 import time
 import flet as ft
 
-from config import client, modelo_embeddings, SYSTEM_PROMPT, UPLOAD_DIR, MAX_CARACTERES_BLOQUE, MODELO_CHAT, MODELO_AUXILIAR, construir_system_prompt, IDIOMAS, IDIOMA_POR_DEFECTO
+from config import client, modelo_embeddings, SYSTEM_PROMPT, UPLOAD_DIR, MAX_CARACTERES_BLOQUE, MODELO_CHAT, MODELO_AUXILIAR, MAX_TOKENS_RESPUESTA, construir_system_prompt, IDIOMAS, IDIOMA_POR_DEFECTO
 from database import (
     crear_usuario, obtener_usuario_por_nombre, verificar_password,
     guardar_chat_db, obtener_todos_los_chats, obtener_mensajes_chat, eliminar_chat_db,
@@ -779,6 +779,7 @@ def main(page: ft.Page):
                     model=MODELO_CHAT,
                     messages=mensajes_para_groq,
                     temperature=0.0,
+                    max_tokens=MAX_TOKENS_RESPUESTA,
                     stream=True
                 )
                 fila_respuesta, ai_markdown = _burbuja_ai("", pregunta=texto)
