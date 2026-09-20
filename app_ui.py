@@ -27,6 +27,7 @@ from citas_evidencia import (
     detectar_negacion_contradictoria, limpiar_negacion_contradictoria,
     verificar_consistencia_fisiologica, construir_lista_fuentes, construir_contexto_para_juez,
     eliminar_referencias_no_citadas, sincronizar_referencias_con_papers,
+    eliminar_referencias_huerfanas_por_id,
     revisar_respuesta_con_ia,
     evaluar_factualidad, resumen_evidencia_citada,
 )
@@ -871,6 +872,9 @@ def main(page: ft.Page):
                     full_response,
                     papers_relevantes,
                     idioma_var[0],
+                )
+                full_response_limpio = eliminar_referencias_huerfanas_por_id(
+                    full_response_limpio
                 )
                 if full_response_limpio != full_response:
                     full_response = full_response_limpio
