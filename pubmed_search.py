@@ -483,7 +483,7 @@ _CATEGORIAS_EVIDENCIA = {
     "Clinical Trial, Phase III": "Evidencia primaria (ensayo clínico)",
     "Clinical Trial, Phase IV": "Evidencia primaria (ensayo clínico)",
     "Observational Study": "Evidencia primaria (observacional)",
-    "Comparative Study": "Sin clasificar",  
+    "Comparative Study": "Sin clasificar",
     "Case Reports": "Evidencia primaria (reporte de caso)",
     "Editorial": "Opinión/comentario",
     "Comment": "Opinión/comentario",
@@ -872,7 +872,6 @@ def _calcular_estado_busqueda(
     else:
         estado = ESTADO_BUSQUEDA_OK
 
-    # Calcular confianza de la búsqueda
     if not hay_papers:
         confianza_busqueda = "baja"
     elif consultas_con_resultados <= 1:
@@ -1180,7 +1179,19 @@ def buscar_europepmc(query: str, retmax: int = 10, rango_anios: tuple = None) ->
 
 
 SEMANTIC_SCHOLAR_BASE = "https://api.semanticscholar.org/graph/v1/paper/search"
-SEMANTIC_SCHOLAR_API_KEY = os.environ.get("SEMANTIC_SCHOLAR_API_KEY", "").strip()
+SEMANTIC_SCHOLAR_BULK_BASE = "https://api.semanticscholar.org/graph/v1/paper/search/bulk"
+SEMANTIC_SCHOLAR_API_KEY = next(
+    (
+        os.environ.get(nombre, "").strip().strip("'\"")
+        for nombre in (
+            "SEMANTIC_SCHOLAR_API_KEY",
+            "SEMANTIC_SCHOLAR_KEY",
+            "S2_API_KEY",
+        )
+        if os.environ.get(nombre, "").strip()
+    ),
+    "",
+)
 _lock_semantic_scholar = threading.Lock()
 _tiempo_ultima_llamada_semantic_scholar = [0.0]
 
@@ -1273,26 +1284,44 @@ def buscar_semantic_scholar(query: str, limit: int = 10, rango_anios: tuple = No
     Devuelve (papers, ok) — 'ok' distingue "el proveedor falló" de
     "el proveedor funcionó y no encontró nada".
     """
-    try:
-        query_encoded = urllib.parse.quote_plus(query)
-        campos = "title,abstract,year,authors,externalIds,venue,publicationTypes,journal"
-        parametros = f"?query={query_encoded}&limit={limit}&fields={campos}"
-        if rango_anios:
-            parametros += f"&year={rango_anios[0]}-{rango_anios[1]}"
-        url = f"{SEMANTIC_SCHOLAR_BASE}{parametros}"
+    campos = "title,abstract,year,authors,externalIds,venue,publicationTypes,journal"
+    headers = {
+        "User-Agent": "MedicineStudyAI/1.0",
+        "Accept": "application/json",
+    }
+    if SEMANTIC_SCHOLAR_API_KEY:
+        headers["x-api-key"] = SEMANTIC_SCHOLAR_API_KEY
+
+    def solicitar(url, parametros):
         _throttle_semantic_scholar()
-        headers = {"User-Agent": "Mozilla/5.0"}
-        if SEMANTIC_SCHOLAR_API_KEY:
-            headers["x-api-key"] = SEMANTIC_SCHOLAR_API_KEY
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=10) as respuesta:
-            datos = json.loads(respuesta.read().decode('utf-8'))
-        resultados = datos.get("data") or []
+        url_completa = f"{url}?{urllib.parse.urlencode(parametros)}"
+        req = urllib.request.Request(url_completa, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=15) as respuesta:
+                return json.loads(respuesta.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            if error.code == 429:
+                espera = error.headers.get("Retry-After")
+                if espera and espera.isdigit():
+                    time.sleep(min(5, max(1, int(espera))))
+            return None
+
+    try:
+        parametros = {"query": query, "fields": campos}
+        if rango_anios:
+            parametros["year"] = f"{rango_anios[0]}-"
+        datos = solicitar(SEMANTIC_SCHOLAR_BULK_BASE, parametros)
+        if datos is None:
+            parametros["limit"] = min(limit, 100)
+            datos = solicitar(SEMANTIC_SCHOLAR_BASE, parametros)
+        if not isinstance(datos, dict):
+            return [], False
+        resultados = (datos.get("data") or [])[:limit]
         papers = []
         for item in resultados:
             p = parsear_resultado_semantic_scholar(item)
             if p:
                 papers.append(p)
         return papers, True
-    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError, TypeError):
         return [], False
