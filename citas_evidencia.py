@@ -366,6 +366,46 @@ def sincronizar_referencias_con_papers(
     return cuerpo.rstrip() + "\n\n" + bloque + "\n"
 
 
+def eliminar_referencias_huerfanas_por_id(respuesta: str) -> str:
+    """Elimina referencias finales cuyo PMID/DOI no aparece en el cuerpo."""
+    encabezado = re.search(
+        r"(?im)^(?:#{0,6}\s*)?(?:\*\*)?\s*"
+        r"(?:referencias|references|références|referenzen|参考文献)"
+        r"\s*:?\s*(?:\*\*)?\s*$",
+        respuesta,
+    )
+    if not encabezado:
+        return respuesta
+    cuerpo = respuesta[:encabezado.start()]
+    ids_cuerpo = {
+        f"PMID:{m.group(1) or m.group(2)}".lower()
+        for m in re.finditer(_PATRON_CITA_PMID, cuerpo, re.IGNORECASE)
+    }
+    ids_cuerpo.update({
+        f"DOI:{(m.group(1) or m.group(2)).lower()}"
+        for m in re.finditer(_PATRON_CITA_DOI, cuerpo, re.IGNORECASE)
+    })
+    cola = respuesta[encabezado.end():]
+    entradas = list(re.finditer(r"(?m)^\s*(?:\*\*)?(?:\[(\d+)\]|(\d+)[.)])(?:\*\*)?\s*", cola))
+    if not entradas:
+        return respuesta
+    conservadas = []
+    for i, entrada in enumerate(entradas):
+        fin = entradas[i + 1].start() if i + 1 < len(entradas) else len(cola)
+        bloque = cola[entrada.start():fin]
+        ids_bloque = {
+            f"PMID:{m.group(1) or m.group(2)}".lower()
+            for m in re.finditer(_PATRON_CITA_PMID, bloque, re.IGNORECASE)
+        }
+        ids_bloque.update({
+            f"DOI:{(m.group(1) or m.group(2)).lower()}"
+            for m in re.finditer(_PATRON_CITA_DOI, bloque, re.IGNORECASE)
+        })
+        if not ids_bloque or ids_bloque.intersection(ids_cuerpo):
+            conservadas.append(bloque)
+    return respuesta[:encabezado.start()] + respuesta[encabezado.start():encabezado.end()] + "".join(conservadas)
+
+
 def revisar_respuesta_con_ia(
     respuesta: str, contexto: str, idioma: str = "es"
 ) -> str:
