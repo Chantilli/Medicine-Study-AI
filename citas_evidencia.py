@@ -123,8 +123,10 @@ def formatear_contexto_papers(papers, idioma="es"):
         return ""
     texto = (
         "📚 LITERATURA CIENTÍFICA MULTIFUENTE (ordenada por relevancia semántica):\n\n"
-        "Criterio de agrupación: se seleccionaron por relevancia, recencia y disponibilidad "
-        "en las fuentes consultadas, no por coherencia temática.\n\n"
+        "NOTA OBLIGATORIA DE CRITERIO DE AGRUPACIÓN: las referencias se seleccionaron "
+        "por relevancia, recencia y disponibilidad en las fuentes consultadas, no por "
+        "coherencia temática. Si analizas dos o más referencias, reproduce o parafrasea "
+        "esta nota antes del análisis.\n\n"
     )
     for i, p in enumerate(papers, start=1):
         score = p.get("score")
@@ -135,9 +137,19 @@ def formatear_contexto_papers(papers, idioma="es"):
             "usa exactamente este ID; no renumeres ni reordenes las referencias. Solo inclúyela en la lista final "
             "si la citas explícitamente en el cuerpo.\n"
         )
-        texto += formatear_cita_vancouver(p) + "\n"
+        titulo = (p.get("titulo") or "").strip()
+        if titulo.lower() in {"[not available]", "not available", "sin título", "untitled"}:
+            titulo = "[título no disponible en los metadatos; verificar en la fuente original]"
+        paper_para_cita = dict(p)
+        paper_para_cita["titulo"] = titulo
+        texto += formatear_cita_vancouver(paper_para_cita) + "\n"
         texto += f"Revista (metadatos): {p.get('revista') or '[nombre no disponible en los metadatos]'}\n"
         texto += f"Fuente de recuperación: {p.get('fuente_bd') or 'PubMed'}\n"
+        if p.get("calidad_revista") == "no_verificada":
+            texto += (
+                "Advertencia de calidad: revista no verificada como fuente biomédica "
+                "indexada; usar con cautela y no tratarla como evidencia clínica de alto nivel.\n"
+            )
         if "desolation" in (p.get("titulo") or "").lower():
             texto += (
                 "Nota del título: [posible artefacto de traducción en el título; "
