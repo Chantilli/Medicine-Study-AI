@@ -44,6 +44,27 @@ _REVISTAS_NO_VERIFICADAS = frozenset({
     "journal of media critiques",
     "lumen et virtus",
 })
+EXCLUDED_VENUES = frozenset({
+    "video journal of biomedicine", "journal of media critiques", "lumen et virtus",
+    "revista sociedade científica", "epistemus", "revista delos",
+})
+EXCLUDED_VENUE_PATTERNS = (
+    re.compile(r"\bvideo\b", re.I),
+    re.compile(r"\banais\b", re.I),
+    re.compile(r"\bproceedings\b", re.I),
+    re.compile(r"\babstract\b", re.I),
+)
+EXCLUDED_PUBLICATION_TYPES = frozenset({
+    "Comment", "Commentary", "Editorial", "Letter", "Published Erratum",
+    "Erratum", "Retracted Publication", "Retraction of Publication",
+    "Congress", "Congresses", "Conference", "Conference Abstract",
+    "Proceedings", "Video-Audio Media", "Video", "Preprint",
+})
+ALLOWED_PUBLICATION_TYPES = frozenset({
+    "Journal Article", "Review", "Meta-Analysis", "Systematic Review",
+    "Randomized Controlled Trial", "Clinical Trial", "Clinical Trial, Phase II",
+    "Clinical Trial, Phase III", "Case Reports",
+})
 
 
 def _normalizar_nombre_revista(nombre, doi=None):
@@ -72,6 +93,46 @@ def _calidad_revista(nombre, fuente_bd=None, pmid=None):
     if fuente_bd == "Semantic Scholar" and not pmid:
         return "no_verificada"
     return "no_evaluada"
+
+
+def _venue_excluido(nombre):
+    limpio = (nombre or "").strip().lower()
+    return limpio in EXCLUDED_VENUES or any(p.search(limpio) for p in EXCLUDED_VENUE_PATTERNS)
+
+
+def _paper_permitido(paper, consulta=""):
+    """Gate conservador de tipos, indexación y venue antes del ranking."""
+    if not _titulo_valido(paper.get("titulo")):
+        return False
+    if any(p.search(str(paper.get("titulo") or "")) for p in EXCLUDED_VENUE_PATTERNS):
+        return False
+    if _venue_excluido(paper.get("revista")):
+        return False
+    idiomas = {str(i).lower() for i in (paper.get("idiomas") or [])}
+    if idiomas and not idiomas.intersection({"eng", "en", "spa", "es", "por", "pt"}):
+        return False
+    tipos = {str(t).strip() for t in (paper.get("tipos_publicacion") or [])}
+    if tipos.intersection(EXCLUDED_PUBLICATION_TYPES):
+        return False
+    reconocidos = tipos.intersection(ALLOWED_PUBLICATION_TYPES)
+    if "Case Reports" in reconocidos and not re.search(r"\b(case|report|reporte|caso)\b", consulta or "", re.I):
+        reconocidos.discard("Case Reports")
+    return bool(reconocidos)
+
+
+def _cruzar_semantic_con_pubmed(papers_semantic, papers_pubmed):
+    """Semantic Scholar solo descubre; el paper debe existir también en PubMed."""
+    claves = set()
+    for paper in papers_pubmed:
+        if paper.get("pmid"):
+            claves.add(("pmid", _normalizar_pmid(paper["pmid"])))
+        if paper.get("doi"):
+            claves.add(("doi", _normalizar_doi(paper["doi"])))
+    return [
+        paper for paper in papers_semantic
+        if (paper.get("pmid") and ("pmid", _normalizar_pmid(paper["pmid"])) in claves)
+        or (paper.get("doi") and ("doi", _normalizar_doi(paper["doi"])) in claves)
+    ]
 
 
 def _parsear_json_juez(texto: str):
@@ -170,6 +231,11 @@ def parsear_articulo_pubmed(articulo):
         for tp in articulo.findall('.//PublicationType')
         if tp.text and tp.text.strip()
     ]
+    idiomas = [
+        (element.text or "").strip().lower()
+        for element in articulo.findall(".//Language")
+        if element.text
+    ]
 
     if not pmid and not titulo:
         return None
@@ -186,6 +252,7 @@ def parsear_articulo_pubmed(articulo):
         "paginas": paginas,
         "doi": doi,
         "tipos_publicacion": tipos_publicacion,
+        "idiomas": idiomas,
         "calidad_revista": _calidad_revista(revista, "PubMed", pmid),
     }
 
@@ -747,6 +814,13 @@ def _es_query_valida(linea: str) -> bool:
 
 def _esearch_pubmed(query: str, fecha_inicio: int = None, fecha_fin: int = None) -> list:
     """Una sola llamada a esearch. Devuelve la lista de PMIDs (puede ser vacía)."""
+    filtros_tipo = (
+        ' AND ("Journal Article"[Publication Type] OR "Review"[Publication Type] '
+        'OR "Meta-Analysis"[Publication Type] OR "Systematic Review"[Publication Type] '
+        'OR "Randomized Controlled Trial"[Publication Type] OR "Clinical Trial"[Publication Type])'
+    )
+    filtros_idioma = ' AND (english[Language] OR spanish[Language] OR portuguese[Language])'
+    query = f"({query}){filtros_tipo}{filtros_idioma}"
     if fecha_inicio is not None and fecha_fin is not None:
         query = (
             f"({query}) AND "
@@ -996,7 +1070,7 @@ def buscar_pubmed_estructurado(consulta, usuario_id):
                 raiz = arbol.getroot()
             for articulo in raiz.findall('.//PubmedArticle'):
                 p = parsear_articulo_pubmed(articulo)
-                if p:
+                if p and _paper_permitido(p, consulta):
                     papers.append(p)
 
         rango_fuente = (
@@ -1017,6 +1091,9 @@ def buscar_pubmed_estructurado(consulta, usuario_id):
         }
 
         papers_epmc, epmc_ok = buscar_europepmc(query_usada, rango_anios=rango_fuente)
+        papers_epmc = [
+            p for p in papers_epmc if _paper_permitido(p, consulta)
+        ]
         n_epmc_nuevos = _fusionar_sin_duplicados(papers, papers_epmc, pmids_vistos, dois_vistos)
         if papers_epmc:
             intentos_debug.append(
@@ -1027,6 +1104,11 @@ def buscar_pubmed_estructurado(consulta, usuario_id):
             intentos_debug.append(f"Europe PMC ('{query_usada}') → error de proveedor")
 
         papers_s2, s2_ok = buscar_semantic_scholar(query_usada, rango_anios=rango_fuente)
+        papers_s2 = [
+            p for p in papers_s2
+            if _paper_permitido(p, consulta)
+        ]
+        papers_s2 = _cruzar_semantic_con_pubmed(papers_s2, papers)
         n_s2_nuevos = _fusionar_sin_duplicados(papers, papers_s2, pmids_vistos, dois_vistos)
         if papers_s2:
             intentos_debug.append(
@@ -1139,6 +1221,8 @@ def parsear_resultado_europepmc(item: dict):
     fontanería existente (ranking, dedup, citas, evidencia).
     Devuelve None si no trae ni título.
     """
+    if item.get("source") != "MED":
+        return None
     titulo = (item.get("title") or "").strip()
     if not _titulo_valido(titulo):
         return None
@@ -1153,6 +1237,8 @@ def parsear_resultado_europepmc(item: dict):
         for t in tipos_crudos
         if t.strip().lower() in _EUROPEPMC_TIPO_A_PUBMED
     ]
+    if not tipos_publicacion:
+        return None
 
     return {
         "pmid": item.get("pmid") or None,
@@ -1166,6 +1252,7 @@ def parsear_resultado_europepmc(item: dict):
         "numero": (item.get("issue") or "").strip() or None,
         "paginas": (item.get("pageInfo") or "").strip() or None,
         "tipos_publicacion": tipos_publicacion,
+        "idiomas": [str(item.get("language") or "").strip().lower()] if item.get("language") else [],
         "fuente_bd": "Europe PMC",
         "calidad_revista": _calidad_revista(
             _resolver_revista(item.get("journalTitle"), item.get("doi")),
@@ -1263,6 +1350,7 @@ def _throttle_semantic_scholar():
         _tiempo_ultima_llamada_semantic_scholar[0] = time.time()
 
 _S2_TIPO_A_PUBMED = {
+    "journal": "Journal Article",
     "review": "Review",
     "metaanalysis": "Meta-Analysis",
     "casereport": "Case Reports",
