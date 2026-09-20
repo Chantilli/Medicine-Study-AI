@@ -355,9 +355,18 @@ Reglas obligatorias:
    elimínalo si no es necesario.
 3. No agregues hechos, cifras, mecanismos ni referencias que no estén en el
    contexto. No uses memoria externa.
-4. Conserva la estructura y el idioma del borrador ({idioma}), pero devuelve
+4. Respeta las escalas temporales: no apliques una transición metabólica fetal-
+   adulta a una fase de milisegundos del ciclo cardíaco. Excluye referencias que
+   solo usen la fase cardíaca como variable en un paradigma de aprendizaje,
+   neurofisiología o conducta; si se conservan, declara que no describen la
+   mecánica del ciclo.
+5. La sístole atrial comienza con el inicio de la onda P o después de él,
+   nunca antes de la onda P. La eyección rápida corresponde al ST, la reducida
+   al inicio de T hasta aproximadamente su pico y la relajación al pico hasta
+   el final de T.
+6. Conserva la estructura y el idioma del borrador ({idioma}), pero devuelve
    únicamente la respuesta corregida, sin comentarios sobre la revisión.
-5. No escribas una sección de referencias. El sistema la reconstruirá desde
+7. No escribas una sección de referencias. El sistema la reconstruirá desde
    los IDs citados después de esta pasada.
 
 CONTEXTO DE FUENTES:
