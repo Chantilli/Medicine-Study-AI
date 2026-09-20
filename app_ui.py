@@ -823,7 +823,7 @@ def main(page: ft.Page):
                 historial.append({"role": "user", "content": f"{bloque_total_contexto}\nPregunta: {texto}{sufijo_riesgo_personal}"})
                 historial = recortar_historial(historial)
                 mensajes_para_groq = [{"role": m["role"], "content": m["content"]} for m in historial]
-                mensajes_para_groq[0] = construir_system_prompt(idioma_var[0])
+                mensajes_para_groq[0] = construir_system_prompt(idioma_var[0], texto)
 
                 fila_generando = _agregar_paso_proceso(columna_pasos, t("generando_respuesta", idioma_var[0]))
 
