@@ -1155,20 +1155,47 @@ def buscar_europepmc(query: str, retmax: int = 10, rango_anios: tuple = None) ->
     búsqueda funcionó y simplemente no encontró nada.
     """
     try:
+        query_busqueda = query
         if rango_anios:
-            query = (
+            query_busqueda = (
                 f"({query}) AND FIRST_PDATE:[{rango_anios[0]}-01-01 "
                 f"TO {rango_anios[1]}-12-31]"
             )
-        query_encoded = urllib.parse.quote_plus(query)
-        url = (
-            f"{EUROPEPMC_BASE}?query={query_encoded}&format=json"
-            f"&resultType=core&pageSize={retmax}"
+        parametros = {
+            "query": query_busqueda,
+            "format": "json",
+            "resultType": "core",
+            "pageSize": max(1, min(int(retmax), 1000)),
+            "page": 1,
+        }
+        url = f"{EUROPEPMC_BASE}?{urllib.parse.urlencode(parametros)}"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "MedicineStudyAI/1.0 (Europe PMC REST client)",
+                "Accept": "application/json",
+            },
         )
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=10) as respuesta:
-            datos = json.loads(respuesta.read().decode('utf-8'))
+        try:
+            with urllib.request.urlopen(req, timeout=15) as respuesta:
+                datos = json.loads(respuesta.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            # Algunas instalaciones rechazan consultas con el filtro de fecha;
+            # reintenta la misma búsqueda sin alterar el proveedor ni el formato.
+            if rango_anios and error.code == 400:
+                parametros["query"] = query
+                url = f"{EUROPEPMC_BASE}?{urllib.parse.urlencode(parametros)}"
+                req = urllib.request.Request(url, headers={
+                    "User-Agent": "MedicineStudyAI/1.0 (Europe PMC REST client)",
+                    "Accept": "application/json",
+                })
+                with urllib.request.urlopen(req, timeout=15) as respuesta:
+                    datos = json.loads(respuesta.read().decode("utf-8"))
+            else:
+                return [], False
         resultados = datos.get("resultList", {}).get("result", [])
+        if isinstance(resultados, dict):
+            resultados = [resultados]
         papers = []
         for item in resultados:
             p = parsear_resultado_europepmc(item)
