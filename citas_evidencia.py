@@ -61,6 +61,8 @@ def formatear_cita_vancouver(p):
         piezas.append(detalle + ".")
     if p.get("doi"):
         piezas.append(f"doi: {p['doi']}")
+        if str(p["doi"]).lower().startswith("10.5281/zenodo."):
+            piezas.append("[DOI de repositorio; verificar DOI editorial]")
     return " ".join(piezas).strip()
 
 
@@ -427,6 +429,16 @@ Reglas obligatorias:
    elimínalo si no es necesario.
 3. No agregues hechos, cifras, mecanismos ni referencias que no estén en el
    contexto. No uses memoria externa.
+3a. Si dos fuentes proporcionan cifras, edades, incidencias o conclusiones
+   incompatibles, no elijas una silenciosamente: indica que existe una
+   discrepancia, atribuye cada dato a su fuente y evita presentar una cifra
+   controvertida como consenso. Una revisión o abstract aislado no puede
+   invalidar por sí solo múltiples estudios primarios concordantes.
+3b. Si la pregunta trata de leucemia aguda, CML/LMC es una leucemia crónica:
+   no la incluyas bajo el encabezado de leucemia aguda. Si aporta contexto,
+   muévela a "Fuera de alcance (contexto relacionado)".
+3c. Sustituye "método más fiable" por "predictor pronóstico independiente más
+   potente" cuando el contexto solo respalde la fuerza pronóstica de MRD.
 4. Respeta las escalas temporales: no apliques una transición metabólica fetal-
    adulta a una fase de milisegundos del ciclo cardíaco. Excluye referencias que
    solo usen la fase cardíaca como variable en un paradigma de aprendizaje,
@@ -455,6 +467,54 @@ BORRADOR:
                     "role": "system",
                     "content": "Verifica cada cita de forma literal y sé conservador.",
                 },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.0,
+            max_tokens=MAX_TOKENS_JUEZ,
+        )
+        corregida = resultado.choices[0].message.content
+        return corregida.strip() if corregida and corregida.strip() else respuesta
+    except Exception:
+        return respuesta
+
+
+def auditar_contradicciones_evidencia(
+    respuesta: str, contexto: str, idioma: str = "es"
+) -> str:
+    """Segunda pasada para conflictos entre fuentes y errores de clasificación."""
+    if not client or not contexto.strip() or not respuesta.strip():
+        return respuesta
+    prompt = f"""
+Audita esta respuesta médica contra TODO el contexto de fuentes.
+No uses conocimiento externo para inventar datos, pero sí detecta conflictos
+internos entre las fuentes. Devuelve solo la respuesta corregida.
+
+Reglas:
+- Si dos fuentes discrepan en edad pico, incidencia, prevalencia, fechas o
+  cualquier cifra, conserva la atribución a cada fuente y declara la
+  discrepancia; no presentes una fuente aislada como verdad universal.
+- Da prioridad a estudios primarios directamente relevantes y a la
+  convergencia de varias fuentes, pero no borres una fuente discordante:
+  márcala como resultado discrepante o posible error de fuente.
+- "Leucemia aguda" no incluye CML/LMC. CML es crónica; sepárala en
+  "Fuera de alcance (contexto relacionado)" o elimínala.
+- MRD puede describirse como predictor pronóstico independiente potente,
+  no como "método más fiable" salvo que una fuente lo diga literalmente.
+- No inventes títulos, autores, DOI, PMID, números de referencia ni datos.
+- Las referencias deben corresponder exactamente a las citas del cuerpo.
+- Conserva el idioma {idioma}, las citas PMID/DOI y las comillas directas.
+
+CONTEXTO:
+{contexto}
+
+RESPUESTA:
+{respuesta}
+"""
+    try:
+        resultado = client.chat.completions.create(
+            model=MODELO_JUEZ,
+            messages=[
+                {"role": "system", "content": "Eres un auditor de contradicciones biomédicas."},
                 {"role": "user", "content": prompt},
             ],
             temperature=0.0,
