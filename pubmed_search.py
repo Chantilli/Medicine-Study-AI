@@ -22,7 +22,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 
 from config import client, modelo_embeddings, RETMAX_PUBMED, TOP_K_PAPERS, UMBRAL_SIMILITUD_PAPER, MAX_CHARS_ABSTRACT_CONTEXTO, MODELO_AUXILIAR
-from database import DB_PATH
+from database import DB_PATH, obtener_conexion_db
 from rag_embeddings import generar_embedding
 
 
@@ -553,7 +553,7 @@ def _clave_relevancia_recencia(paper: dict) -> tuple:
 
 
 def contar_papers_usuario(usuario_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = obtener_conexion_db()
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM papers WHERE usuario_id = ?", (usuario_id,))
     total = cursor.fetchone()[0]
@@ -677,7 +677,7 @@ def guardar_papers(usuario_id, papers):
     if not papers:
         return [], contar_papers_usuario(usuario_id)
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = obtener_conexion_db()
     cursor = conn.cursor()
     nuevos = []
     for p in papers:
@@ -802,13 +802,32 @@ def _es_query_valida(linea: str) -> bool:
     """
     if not linea:
         return False
-    if len(linea.split()) > 6:
+    if len(linea.split()) > 10:
         return False
-    if any(marcador in linea for marcador in ("**", "##", ":", ". ")):
+    if any(marcador in linea for marcador in ("**", "##", "System:", "User:")):
         return False
     if re.match(r"^\d+[\.\)]", linea):
         return False
     return True
+
+
+def _leer_http_con_reintentos(req, timeout=15, max_reintentos=2):
+    """Lee una respuesta HTTP y reintenta solo ante fallos transitorios."""
+    for intento in range(max_reintentos + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as respuesta:
+                return respuesta.read()
+        except urllib.error.HTTPError as error:
+            transitorio = error.code in (429, 500, 502, 503, 504)
+            if not transitorio or intento == max_reintentos:
+                raise
+            retry_after = error.headers.get("Retry-After")
+            espera = float(retry_after) if retry_after and retry_after.isdigit() else 1.0 * (2 ** intento)
+            time.sleep(min(8.0, max(0.25, espera)))
+        except (urllib.error.URLError, TimeoutError, OSError):
+            if intento == max_reintentos:
+                raise
+            time.sleep(min(8.0, 1.0 * (2 ** intento)))
 
 
 
@@ -835,8 +854,9 @@ def _esearch_pubmed(query: str, fecha_inicio: int = None, fecha_fin: int = None)
         f"&sort=relevance&retmode=json"
     )
     req = urllib.request.Request(url_search, headers={'User-Agent': 'Mozilla/5.0'})
-    with urllib.request.urlopen(req, timeout=8) as respuesta:
-        datos_busqueda = json.loads(respuesta.read().decode('utf-8'))
+    datos_busqueda = json.loads(
+        _leer_http_con_reintentos(req, timeout=8).decode("utf-8")
+    )
     return datos_busqueda.get("esearchresult", {}).get("idlist", [])
 
 
@@ -1065,10 +1085,16 @@ def buscar_pubmed_estructurado(consulta, usuario_id):
                 f"?db=pubmed&id={ids_string}&retmode=xml"
             )
             req_fetch = urllib.request.Request(url_fetch, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req_fetch, timeout=10) as respuesta_xml:
-                arbol = ET.parse(respuesta_xml)
-                raiz = arbol.getroot()
-            for articulo in raiz.findall('.//PubmedArticle'):
+            try:
+                xml_raw = _leer_http_con_reintentos(req_fetch, timeout=12).decode(
+                    "utf-8", errors="replace"
+                )
+                xml_limpio = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", "", xml_raw)
+                raiz = ET.fromstring(xml_limpio)
+            except (ET.ParseError, urllib.error.URLError, TimeoutError, OSError) as error:
+                intentos_debug.append(f"Error parseando XML de efetch: {error}")
+                raiz = None
+            for articulo in raiz.findall('.//PubmedArticle') if raiz is not None else []:
                 p = parsear_articulo_pubmed(articulo)
                 if p and _paper_permitido(p, consulta):
                     papers.append(p)
@@ -1293,11 +1319,9 @@ def buscar_europepmc(query: str, retmax: int = 10, rango_anios: tuple = None) ->
             },
         )
         try:
-            with urllib.request.urlopen(req, timeout=15) as respuesta:
-                datos = json.loads(respuesta.read().decode("utf-8"))
+            datos = json.loads(_leer_http_con_reintentos(req, timeout=15).decode("utf-8"))
         except urllib.error.HTTPError as error:
-            # Algunas instalaciones rechazan consultas con el filtro de fecha;
-            # reintenta la misma búsqueda sin alterar el proveedor ni el formato.
+            
             if rango_anios and error.code == 400:
                 parametros["query"] = query
                 url = f"{EUROPEPMC_BASE}?{urllib.parse.urlencode(parametros)}"
@@ -1305,8 +1329,7 @@ def buscar_europepmc(query: str, retmax: int = 10, rango_anios: tuple = None) ->
                     "User-Agent": "MedicineStudyAI/1.0 (Europe PMC REST client)",
                     "Accept": "application/json",
                 })
-                with urllib.request.urlopen(req, timeout=15) as respuesta:
-                    datos = json.loads(respuesta.read().decode("utf-8"))
+                datos = json.loads(_leer_http_con_reintentos(req, timeout=15).decode("utf-8"))
             else:
                 return [], False
         resultados = datos.get("resultList", {}).get("result", [])
@@ -1447,8 +1470,9 @@ def _metadatos_crossref_doi(doi: str) -> dict:
             url,
             headers={"User-Agent": "MedicineStudyAI/1.0 (mailto:contact@example.com)"},
         )
-        with urllib.request.urlopen(req, timeout=8) as respuesta:
-            mensaje = json.loads(respuesta.read().decode("utf-8")).get("message", {})
+        mensaje = json.loads(
+            _leer_http_con_reintentos(req, timeout=8).decode("utf-8")
+        ).get("message", {})
         titulos = mensaje.get("title") or []
         if titulos:
             resultado["titulo"] = str(titulos[0]).strip()
@@ -1510,8 +1534,7 @@ def buscar_semantic_scholar(query: str, limit: int = 10, rango_anios: tuple = No
         url_completa = f"{url}?{urllib.parse.urlencode(parametros)}"
         req = urllib.request.Request(url_completa, headers=headers)
         try:
-            with urllib.request.urlopen(req, timeout=15) as respuesta:
-                return json.loads(respuesta.read().decode("utf-8"))
+            return json.loads(_leer_http_con_reintentos(req, timeout=15).decode("utf-8"))
         except urllib.error.HTTPError as error:
             if error.code == 429:
                 espera = error.headers.get("Retry-After")
