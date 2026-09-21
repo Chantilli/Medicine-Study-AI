@@ -291,6 +291,20 @@ TEXTOS = {
         "es": "❌ Archivo no identificado", "en": "❌ File not recognized", "fr": "❌ Fichier non identifié",
         "de": "❌ Datei nicht erkannt", "zh": "❌ 无法识别文件",
     },
+    "pdf_demasiado_grande": {
+        "es": "❌ El PDF supera el tamaño máximo permitido (25 MB).",
+        "en": "❌ The PDF exceeds the maximum allowed size (25 MB).",
+        "fr": "❌ Le PDF dépasse la taille maximale autorisée (25 Mo).",
+        "de": "❌ Das PDF überschreitet die maximal zulässige Größe (25 MB).",
+        "zh": "❌ PDF 超过允许的最大大小（25 MB）。",
+    },
+    "pdf_demasiadas_paginas": {
+        "es": "❌ El PDF supera el máximo permitido de 100 páginas.",
+        "en": "❌ The PDF exceeds the maximum allowed length of 100 pages.",
+        "fr": "❌ Le PDF dépasse la limite autorisée de 100 pages.",
+        "de": "❌ Das PDF überschreitet die zulässige Höchstzahl von 100 Seiten.",
+        "zh": "❌ PDF 超过允许的最大页数（100 页）。",
+    },
     "pdf_error_subida": {
         "es": "❌ Error al subir el archivo: {error}", "en": "❌ Error uploading the file: {error}",
         "fr": "❌ Erreur lors du téléchargement du fichier : {error}", "de": "❌ Fehler beim Hochladen der Datei: {error}",
