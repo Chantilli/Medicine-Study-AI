@@ -9,7 +9,11 @@ import time
 import re
 import flet as ft
 
-from config import client, modelo_embeddings, SYSTEM_PROMPT, UPLOAD_DIR, MAX_CARACTERES_BLOQUE, MODELO_CHAT, MODELO_AUXILIAR, MAX_TOKENS_RESPUESTA, construir_system_prompt, IDIOMAS, IDIOMA_POR_DEFECTO
+from config import (
+    client, modelo_embeddings, SYSTEM_PROMPT, UPLOAD_DIR, MAX_CARACTERES_BLOQUE,
+    MODELO_CHAT, MODELO_AUXILIAR, MAX_TOKENS_RESPUESTA, construir_system_prompt,
+    IDIOMAS, IDIOMA_POR_DEFECTO, MAX_PDF_BYTES, MAX_PDF_PAGINAS,
+)
 from database import (
     crear_usuario, obtener_usuario_por_nombre, verificar_password,
     guardar_chat_db, obtener_todos_los_chats, obtener_mensajes_chat, eliminar_chat_db,
@@ -460,9 +464,21 @@ def main(page: ft.Page):
             ruta_final_archivo = UPLOAD_DIR / nombre_archivo
             if not ruta_final_archivo.exists():
                 return
+            if ruta_final_archivo.stat().st_size > MAX_PDF_BYTES:
+                ruta_final_archivo.unlink(missing_ok=True)
+                txt_estado_pdf.value = t("pdf_demasiado_grande", idioma_var[0])
+                page.update()
+                return
 
-            
-            resultado_extraccion = extraer_texto_pdf_con_ocr(ruta_final_archivo)
+            try:
+                resultado_extraccion = extraer_texto_pdf_con_ocr(
+                    ruta_final_archivo, max_paginas=MAX_PDF_PAGINAS
+                )
+            except ValueError:
+                ruta_final_archivo.unlink(missing_ok=True)
+                txt_estado_pdf.value = t("pdf_demasiadas_paginas", idioma_var[0])
+                page.update()
+                return
             texto_extraido = resultado_extraccion["texto"]
             tipo_texto = "ocr" if resultado_extraccion["via_ocr"] else "normal"
 
