@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+historial_chats.db
+historial_chats.db-*
+uploads/
+*.log
