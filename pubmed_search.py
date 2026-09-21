@@ -21,7 +21,10 @@ import urllib.error
 import xml.etree.ElementTree as ET
 import numpy as np
 
-from config import client, modelo_embeddings, RETMAX_PUBMED, TOP_K_PAPERS, UMBRAL_SIMILITUD_PAPER, MAX_CHARS_ABSTRACT_CONTEXTO, MODELO_AUXILIAR
+from config import (
+    client, obtener_modelo_embeddings, RETMAX_PUBMED, TOP_K_PAPERS,
+    UMBRAL_SIMILITUD_PAPER, MAX_CHARS_ABSTRACT_CONTEXTO, MODELO_AUXILIAR,
+)
 from database import DB_PATH, obtener_conexion_db
 from rag_embeddings import generar_embedding
 
@@ -452,6 +455,7 @@ def ranking_semantico(consulta, papers, top_k=TOP_K_PAPERS):
     if not papers:
         return []
 
+    modelo_embeddings = obtener_modelo_embeddings()
     if not modelo_embeddings:
         for paper in papers:
             paper["score_semantico"] = None
@@ -682,7 +686,7 @@ def guardar_papers(usuario_id, papers):
     nuevos = []
     for p in papers:
         vector = p.get("_vector")
-        if vector is None and modelo_embeddings:
+        if vector is None and obtener_modelo_embeddings():
             base = p.get("titulo", "")
             if p.get("resumen"):
                 base += ". " + p["resumen"][:MAX_CHARS_ABSTRACT_CONTEXTO]
@@ -1321,7 +1325,8 @@ def buscar_europepmc(query: str, retmax: int = 10, rango_anios: tuple = None) ->
         try:
             datos = json.loads(_leer_http_con_reintentos(req, timeout=15).decode("utf-8"))
         except urllib.error.HTTPError as error:
-            
+            # Algunas instalaciones rechazan consultas con el filtro de fecha;
+            # reintenta la misma búsqueda sin alterar el proveedor ni el formato.
             if rango_anios and error.code == 400:
                 parametros["query"] = query
                 url = f"{EUROPEPMC_BASE}?{urllib.parse.urlencode(parametros)}"
