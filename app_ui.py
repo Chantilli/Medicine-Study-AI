@@ -10,8 +10,9 @@ import re
 import flet as ft
 
 from config import (
-    client, modelo_embeddings, SYSTEM_PROMPT, UPLOAD_DIR, MAX_CARACTERES_BLOQUE,
+    client, SYSTEM_PROMPT, UPLOAD_DIR, MAX_CARACTERES_BLOQUE,
     MODELO_CHAT, MODELO_AUXILIAR, MAX_TOKENS_RESPUESTA, construir_system_prompt,
+    obtener_modelo_embeddings,
     IDIOMAS, IDIOMA_POR_DEFECTO, MAX_PDF_BYTES, MAX_PDF_PAGINAS,
 )
 from database import (
@@ -488,7 +489,7 @@ def main(page: ft.Page):
                     _tarjeta_aviso(f"🛡️ Filtro de seguridad: {resumir_alertas(alertas_inyeccion)}", tipo="warning")
                 )
 
-            if modelo_embeddings:
+            if obtener_modelo_embeddings():
                 n_fragmentos = guardar_fragmentos_pdf(usuario_actual_id[0], nombre_archivo, texto_extraido, tipo_texto=tipo_texto)
                 if n_fragmentos > 0:
                     if resultado_extraccion["via_ocr"]:
@@ -514,7 +515,7 @@ def main(page: ft.Page):
                 )
 
             
-            if modelo_embeddings:
+            if obtener_modelo_embeddings():
                 try:
                     tablas = extraer_tablas_pdf(ruta_final_archivo)
                 except Exception:
