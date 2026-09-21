@@ -59,7 +59,7 @@ def _ocr_pagina_png(datos_png: bytes) -> str:
     except Exception:
         return ""
 
-def extraer_texto_pdf_con_ocr(ruta_pdf) -> dict:
+def extraer_texto_pdf_con_ocr(ruta_pdf, max_paginas: int = None) -> dict:
     """
     Extrae el texto de un PDF con la estrategia de dos pasadas:
       1. Extracción normal con pypdf (rápida, funciona en PDFs "de texto").
@@ -75,6 +75,10 @@ def extraer_texto_pdf_con_ocr(ruta_pdf) -> dict:
     texto_por_pagina = []
     lector = pypdf.PdfReader(str(ruta_pdf))
     n_paginas = len(lector.pages)
+    if max_paginas is not None and n_paginas > max_paginas:
+        raise ValueError(
+            f"El PDF contiene {n_paginas} páginas; el máximo permitido es {max_paginas}."
+        )
     for pagina in lector.pages:
         try:
             texto_por_pagina.append(pagina.extract_text() or "")
@@ -114,5 +118,4 @@ def extraer_texto_pdf_con_ocr(ruta_pdf) -> dict:
         "paginas_ocreadas": paginas_ocreadas,
         "n_paginas": n_paginas,
     }
-
 
