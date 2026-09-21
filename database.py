@@ -1,7 +1,7 @@
 """
 Base de datos local (SQLite): esquema, migraciones, cuentas de usuario y
-CRUD de chats. DB_PATH se define aquÃ­ y lo importan los demÃ¡s mÃ³dulos
-que tambiÃ©n tocan la misma base (fragmentos, papers).
+CRUD de chats. DB_PATH se define aquí y lo importan los demás módulos
+que también tocan la misma base (fragmentos, papers).
 """
 import json
 import sqlite3
@@ -71,7 +71,7 @@ def inicializar_db():
             paginas TEXT,
             resumen TEXT,
             tipos_publicacion TEXT, -- JSON: ["Randomized Controlled Trial", ...]
-            vector BLOB,           -- embedding del tÃ­tulo+resumen
+            vector BLOB,           -- embedding del título+resumen
             fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(usuario_id, pmid),
             UNIQUE(usuario_id, doi)
@@ -102,8 +102,8 @@ def inicializar_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             usuario_id INTEGER NOT NULL,
             pregunta TEXT NOT NULL,
-            opciones TEXT NOT NULL,          -- JSON: ["opciÃ³n A", "opciÃ³n B", ...]
-            respuesta_correcta INTEGER NOT NULL,  -- Ã­ndice (0-based) en opciones
+            opciones TEXT NOT NULL,          -- JSON: ["opción A", "opción B", ...]
+            respuesta_correcta INTEGER NOT NULL,  -- índice (0-based) en opciones
             explicacion TEXT,
             tema TEXT,
             fuente TEXT,
@@ -209,7 +209,7 @@ def crear_usuario(usuario: str, password: str):
         conn.commit()
         return cursor.lastrowid, None
     except sqlite3.IntegrityError:
-        return None, "Ese nombre de usuario ya estÃ¡ en uso."
+        return None, "Ese nombre de usuario ya está en uso."
     except Exception as e:
         return None, f"No se pudo crear la cuenta: {e}"
     finally:
