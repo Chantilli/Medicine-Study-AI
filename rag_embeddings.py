@@ -7,8 +7,17 @@ la base de datos (DB_PATH en database.py).
 import sqlite3
 import numpy as np
 
-from config import modelo_embeddings, TAMANO_FRAGMENTO, SOLAPAMIENTO_FRAGMENTO, TOP_K_FRAGMENTOS, UMBRAL_SIMILITUD_FRAGMENTOS
-from database import DB_PATH
+from config import (
+    obtener_modelo_embeddings, TAMANO_FRAGMENTO, SOLAPAMIENTO_FRAGMENTO,
+    TOP_K_FRAGMENTOS, UMBRAL_SIMILITUD_FRAGMENTOS,
+)
+from database import DB_PATH, obtener_conexion_db
+
+modelo_embeddings = None
+
+
+def _obtener_modelo():
+    return modelo_embeddings or obtener_modelo_embeddings()
 
 
 def dividir_en_fragmentos(texto: str, tamano=TAMANO_FRAGMENTO, solapamiento=SOLAPAMIENTO_FRAGMENTO):
@@ -32,6 +41,7 @@ def generar_embedding(texto: str):
     """Convierte un texto en un vector numérico normalizado (para que el
     producto punto entre dos vectores sea directamente su similitud de
     coseno)."""
+    modelo_embeddings = _obtener_modelo()
     if not modelo_embeddings or not texto:
         return None
     vector = modelo_embeddings.encode(texto, normalize_embeddings=True)
@@ -49,13 +59,13 @@ def guardar_fragmentos_pdf(usuario_id, nombre_fuente: str, texto_completo: str, 
     reconocido en páginas escaneadas). Se usa solo para mostrarlo en la UI
     y en el panel de trazabilidad — no cambia cómo se busca.
     """
-    if not modelo_embeddings:
+    if not _obtener_modelo():
         return 0
     fragmentos = dividir_en_fragmentos(texto_completo)
     if not fragmentos:
         return 0
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = obtener_conexion_db()
     cursor = conn.cursor()
    
     cursor.execute(
@@ -87,10 +97,10 @@ def buscar_fragmentos_relevantes(usuario_id, pregunta: str, top_k=TOP_K_FRAGMENT
     tipo_texto indica si ese fragmento vino de texto normal del PDF o de
     OCR sobre una página escaneada.
     """
-    if not modelo_embeddings:
+    if not _obtener_modelo():
         return []
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = obtener_conexion_db()
     cursor = conn.cursor()
     cursor.execute("SELECT fuente, texto, vector, tipo_texto FROM fragmentos WHERE usuario_id = ?", (usuario_id,))
     filas = cursor.fetchall()
@@ -111,4 +121,3 @@ def buscar_fragmentos_relevantes(usuario_id, pregunta: str, top_k=TOP_K_FRAGMENT
 
     resultados.sort(key=lambda r: r[0], reverse=True)
     return resultados[:top_k]
-
