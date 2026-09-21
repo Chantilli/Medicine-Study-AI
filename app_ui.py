@@ -1,8 +1,8 @@
 """
-Aplicación principal Flet: login/registro, sidebar, chat, subida de PDF
-(con OCR), búsqueda en PubMed/Europe PMC, verificación de factualidad y
-consistencia fisiológica. Toda la lógica de negocio vive en los otros
-módulos — este archivo solo arma la interfaz y conecta los eventos.
+AplicaciÃ³n principal Flet: login/registro, sidebar, chat, subida de PDF
+(con OCR), bÃºsqueda en PubMed/Europe PMC, verificaciÃ³n de factualidad y
+consistencia fisiolÃ³gica. Toda la lÃ³gica de negocio vive en los otros
+mÃ³dulos â€” este archivo solo arma la interfaz y conecta los eventos.
 """
 import os
 import time
@@ -58,7 +58,7 @@ except ImportError as error:
             return f"[{indice}]" if indice else ""
 
         return re.sub(
-            r"(?:\[\s*PMID\s*:\s*(\d+)\s*\]|【\s*PMID\s*:\s*(\d+)\s*†?\s*】)",
+            r"(?:\[\s*PMID\s*:\s*(\d+)\s*\]|ã€\s*PMID\s*:\s*(\d+)\s*â€ ?\s*ã€‘)",
             reemplazar,
             respuesta,
             flags=re.IGNORECASE,
@@ -90,12 +90,18 @@ from clasificador_riesgo_clinico import (
     aviso_riesgo_personal, instruccion_refuerzo_riesgo_personal,
 )
 from traducciones import t, t_categoria
+from ui_components import (
+    tarjeta_aviso, indicador_carga, indicador_streaming,
+    chip_sugerencia, tarjeta_funcion,
+)
+from ui_shell import configurar_shell_responsive
 
 
 def main(page: ft.Page):
     page.title = "Medicine Study AI"
     page.theme_mode = ft.ThemeMode.DARK
     page.bgcolor = "#111217"
+    tema_oscuro = [True]
 
   
     page.upload_files_dir = str(UPLOAD_DIR)
@@ -137,30 +143,6 @@ def main(page: ft.Page):
     txt_estado_pdf = ft.Text("", size=12, color="#22c55e", italic=True)
 
 
-    def _tarjeta_aviso(contenido, tipo="info"):
-        """Tarjeta de aviso reutilizable — reemplaza los Container(...)
-        repetidos a mano para alertas de citas inventadas, inconsistencias
-        fisiológicas, límites de uso, emergencias, etc. `contenido` puede
-        ser un string o ya un ft.Control (para avisos con varias líneas)."""
-        estilos = {
-            "error": ("#3b1a1a", "#ef4444", "#fca5a5"),
-            "warning": ("#3a2f0f", "#f59e0b", "#fde68a"),
-            "info": ("#1e293b", "#3b82f6", "#93c5fd"),
-        }
-        bg, borde, color_texto = estilos.get(tipo, estilos["info"])
-        hijo = contenido if isinstance(contenido, ft.Control) else ft.Text(contenido, color=color_texto, size=12)
-        return ft.Container(
-            content=hijo, bgcolor=bg, border=ft.border.all(1, borde),
-            border_radius=8, padding=10,
-        )
-
-    def _indicador_carga(texto):
-        return ft.Row(
-            [ft.ProgressRing(width=13, height=13, stroke_width=2, color="#3b82f6"),
-             ft.Text(texto, color="#64748b", italic=True, size=12)],
-            spacing=8,
-        )
-
     def _mostrar_snackbar(texto, color_fondo="#1e293b"):
         page.snack_bar = ft.SnackBar(content=ft.Text(texto, color="#f8fafc", size=13), bgcolor=color_fondo, duration=1400)
         page.snack_bar.open = True
@@ -170,9 +152,16 @@ def main(page: ft.Page):
         page.set_clipboard(texto)
         _mostrar_snackbar(t("copiado_portapapeles", idioma_var[0]), color_fondo="#14532d")
 
+    def _chip_sugerencia(texto):
+        def click(e):
+            entrada.value = texto
+            page.update()
+            entrada.focus()
+        return chip_sugerencia(texto, click)
+
     def _burbuja_usuario(texto, indice_historial=None):
         """Burbuja alineada a la derecha. Si se da indice_historial, se
-        habilita el botón de editar (corta el historial ahí y reabre el
+        habilita el botÃ³n de editar (corta el historial ahÃ­ y reabre el
         texto en el cuadro de mensaje)."""
         acciones = []
         if indice_historial is not None:
@@ -206,12 +195,12 @@ def main(page: ft.Page):
 
     def _burbuja_ai(texto="", pregunta=None):
         """Burbuja alineada a la izquierda con Markdown real (negritas,
-        tablas, listas) en vez de texto plano con símbolos crudos.
-        Devuelve (fila, markdown_control) — markdown_control se usa para
+        tablas, listas) en vez de texto plano con sÃ­mbolos crudos.
+        Devuelve (fila, markdown_control) â€” markdown_control se usa para
         ir actualizando el texto mientras llega el streaming.
 
-        'pregunta' es la pregunta del estudiante que generó esta
-        respuesta — se necesita para poder registrar feedback (👍/👎)
+        'pregunta' es la pregunta del estudiante que generÃ³ esta
+        respuesta â€” se necesita para poder registrar feedback (ðŸ‘/ðŸ‘Ž)
         con el par pregunta/respuesta completo. Si no se da (por
         ejemplo, al reconstruir un historial viejo sin esa info), los
         botones de feedback simplemente no aparecen."""
@@ -254,7 +243,7 @@ def main(page: ft.Page):
             ft.Container(
                 content=ft.Column([
                     ft.Row([
-                        ft.Text("🩺 Medicine AI", size=11, weight=ft.FontWeight.BOLD, color="#64748b", expand=True),
+                        ft.Text("ðŸ©º Medicine AI", size=11, weight=ft.FontWeight.BOLD, color="#64748b", expand=True),
                         *botones_feedback,
                         ft.IconButton(
                             icon=ft.Icons.CONTENT_COPY, icon_size=13, icon_color="#64748b",
@@ -274,7 +263,7 @@ def main(page: ft.Page):
 
     def _crear_panel_proceso():
         """Panel plegable donde viven los pasos intermedios de un turno
-        (búsquedas, generación, verificación) — colapsado por defecto."""
+        (bÃºsquedas, generaciÃ³n, verificaciÃ³n) â€” colapsado por defecto."""
         columna_pasos = ft.Column([], spacing=6)
         panel = ft.ExpansionTile(
             title=ft.Row([
@@ -310,8 +299,8 @@ def main(page: ft.Page):
 
     def _renderizar_historial_en_chat():
         """Reconstruye chat_view completo a partir de `historial` (fuente
-        de verdad) — se usa al cargar una conversación guardada y al
-        editar un mensaje (después de truncar el historial)."""
+        de verdad) â€” se usa al cargar una conversaciÃ³n guardada y al
+        editar un mensaje (despuÃ©s de truncar el historial)."""
         chat_view.controls.clear()
         ultima_pregunta_limpia = None
         for idx, msg in enumerate(historial):
@@ -335,36 +324,14 @@ def main(page: ft.Page):
                 if msg.get("_evidencia"):
                     resumen_evidencia = msg["_evidencia"]
                     nivel_traducido = t_categoria(resumen_evidencia["nivel_mas_fuerte"], idioma_var[0])
-                    chat_view.controls.append(_tarjeta_aviso(
-                        "🏅 " + t(
+                    chat_view.controls.append(tarjeta_aviso(
+                        "ðŸ… " + t(
                             "badge_evidencia_citada", idioma_var[0],
                             nivel=nivel_traducido, n=resumen_evidencia["n_papers_citados"],
                         ),
                         tipo="info",
                     ))
         page.update()
-
-    def _chip_sugerencia(texto):
-        def click(e):
-            entrada.value = texto
-            page.update()
-            entrada.focus()
-        return ft.Container(
-            content=ft.Text(texto, size=12, color="#cbd5e1"),
-            bgcolor="#1a1b23", border=ft.border.all(1, "#2a2b36"), border_radius=20,
-            padding=ft.Padding(14, 8, 14, 8), on_click=click, ink=True,
-        )
-
-    def _tarjeta_funcion(icono, titulo, descripcion):
-        return ft.Container(
-            content=ft.Column([
-                ft.Icon(icono, size=22, color="#60a5fa"),
-                ft.Text(titulo, size=13, weight=ft.FontWeight.BOLD, color="#f1f5f9"),
-                ft.Text(descripcion, size=11, color="#64748b"),
-            ], spacing=4),
-            bgcolor="#15161c", border=ft.border.all(1, "#22232d"), border_radius=12,
-            padding=14, width=220,
-        )
 
     def mostrar_pantalla_bienvenida():
         chat_view.controls.clear()
@@ -381,10 +348,10 @@ def main(page: ft.Page):
                     ),
                     ft.Container(height=12),
                     ft.Row([
-                        _tarjeta_funcion(ft.Icons.SEARCH, t("func_pubmed_titulo", idioma), t("func_pubmed_desc", idioma)),
-                        _tarjeta_funcion(ft.Icons.UPLOAD_FILE_OUTLINED, t("func_pdfs_titulo", idioma), t("func_pdfs_desc", idioma)),
-                        _tarjeta_funcion(ft.Icons.FACT_CHECK_OUTLINED, t("func_factualidad_titulo", idioma), t("func_factualidad_desc", idioma)),
-                        _tarjeta_funcion(ft.Icons.CALCULATE_OUTLINED, t("func_calculadoras_titulo", idioma), t("func_calculadoras_desc", idioma)),
+                        tarjeta_funcion(ft.Icons.SEARCH, t("func_pubmed_titulo", idioma), t("func_pubmed_desc", idioma)),
+                        tarjeta_funcion(ft.Icons.UPLOAD_FILE_OUTLINED, t("func_pdfs_titulo", idioma), t("func_pdfs_desc", idioma)),
+                        tarjeta_funcion(ft.Icons.FACT_CHECK_OUTLINED, t("func_factualidad_titulo", idioma), t("func_factualidad_desc", idioma)),
+                        tarjeta_funcion(ft.Icons.CALCULATE_OUTLINED, t("func_calculadoras_titulo", idioma), t("func_calculadoras_desc", idioma)),
                     ], wrap=True, spacing=12, alignment=ft.MainAxisAlignment.CENTER),
                     ft.Container(height=16),
                     ft.Text(t("prueba_con_algo_como", idioma), size=11, color="#64748b"),
@@ -400,7 +367,7 @@ def main(page: ft.Page):
             chat_view.controls.clear()
             chat_view.controls.append(
                 ft.Text(
-                    f"✨ Medicine Study AI\n{t('bienvenida_subtitulo', idioma)}\n\n"
+                    f"âœ¨ Medicine Study AI\n{t('bienvenida_subtitulo', idioma)}\n\n"
                     f"(No se pudo cargar la pantalla de inicio completa: {ex})",
                     size=15, color="#e2e8f0",
                 )
@@ -423,6 +390,13 @@ def main(page: ft.Page):
         aplicar_idioma_ui(idioma_var[0])
         chat_view.controls.clear()
         mostrar_pantalla_bienvenida()
+
+    def cambiar_tema(e):
+        tema_oscuro[0] = e.control.value
+        page.theme_mode = ft.ThemeMode.DARK if tema_oscuro[0] else ft.ThemeMode.LIGHT
+        page.bgcolor = "#111217" if tema_oscuro[0] else "#f8fafc"
+        sidebar.bgcolor = page.bgcolor
+        page.update()
 
     def al_seleccionar_archivo(e):
         archivos = getattr(e, "files", None)
@@ -486,7 +460,7 @@ def main(page: ft.Page):
             texto_extraido, alertas_inyeccion = sanitizar_texto_pdf(texto_extraido)
             if alertas_inyeccion:
                 chat_view.controls.append(
-                    _tarjeta_aviso(f"🛡️ Filtro de seguridad: {resumir_alertas(alertas_inyeccion)}", tipo="warning")
+                    tarjeta_aviso(f"ðŸ›¡ï¸ Filtro de seguridad: {resumir_alertas(alertas_inyeccion)}", tipo="warning")
                 )
 
             if obtener_modelo_embeddings():
@@ -524,7 +498,7 @@ def main(page: ft.Page):
                     n_tablas_indexadas = 0
                     for tabla in tablas:
                         fuente_tabla = (
-                            f"{nombre_archivo} · tabla {tabla['indice_en_pagina']} (pág. {tabla['pagina']})"
+                            f"{nombre_archivo} Â· tabla {tabla['indice_en_pagina']} (pÃ¡g. {tabla['pagina']})"
                         )
                         markdown_tabla, alertas_tabla = sanitizar_texto_pdf(tabla["markdown"])
                         if alertas_tabla:
@@ -546,7 +520,7 @@ def main(page: ft.Page):
 
         except Exception as ex:
             txt_estado_pdf.value = t("pdf_error_proceso", idioma_var[0])
-            chat_view.controls.append(_tarjeta_aviso(
+            chat_view.controls.append(tarjeta_aviso(
                 t("pdf_no_procesado", idioma_var[0], error=ex), tipo="error"
             ))
         page.update()
@@ -615,7 +589,7 @@ def main(page: ft.Page):
                 ft.Container(
                     content=ft.Row([
                         ft.Container(
-                            content=ft.Text(f"💬 {titulo}", color="#94a3b8", size=13, overflow=ft.TextOverflow.ELLIPSIS),
+                            content=ft.Text(f"ðŸ’¬ {titulo}", color="#94a3b8", size=13, overflow=ft.TextOverflow.ELLIPSIS),
                             data=c_id,
                             on_click=cargar_conversacion_vieja,
                             expand=True
@@ -673,7 +647,7 @@ def main(page: ft.Page):
                 chat_view.controls.clear()
             entrada.value = ""
             chat_view.controls.append(_burbuja_usuario(texto))
-            chat_view.controls.append(_tarjeta_aviso(f"🚦 {limite_chat['motivo']}", tipo="warning"))
+            chat_view.controls.append(tarjeta_aviso(f"ðŸš¦ {limite_chat['motivo']}", tipo="warning"))
             page.update()
             return
         registrar_solicitud(usuario_actual_id[0], "chat")
@@ -690,7 +664,7 @@ def main(page: ft.Page):
                 mensaje_emergencia_salud_mental(idioma_var[0]) if clasificacion.get("subtipo") == "salud_mental"
                 else mensaje_emergencia_medica(idioma_var[0])
             )
-            chat_view.controls.append(_tarjeta_aviso(
+            chat_view.controls.append(tarjeta_aviso(
                 ft.Text(texto_mensaje_emergencia, color="#fca5a5", size=13), tipo="error"
             ))
             page.update()
@@ -702,7 +676,7 @@ def main(page: ft.Page):
 
         sufijo_riesgo_personal = ""
         if clasificacion["categoria"] == "riesgo_personal":
-            chat_view.controls.append(_tarjeta_aviso(aviso_riesgo_personal(idioma_var[0]), tipo="info"))
+            chat_view.controls.append(tarjeta_aviso(aviso_riesgo_personal(idioma_var[0]), tipo="info"))
             page.update()
             sufijo_riesgo_personal = instruccion_refuerzo_riesgo_personal(idioma_var[0])
 
@@ -717,7 +691,7 @@ def main(page: ft.Page):
             limite_pubmed = verificar_limite(usuario_actual_id[0], "pubmed", idioma=idioma_var[0])
             if not limite_pubmed["permitido"]:
                 columna_pasos.controls.append(
-                    ft.Text(f"🚦 {limite_pubmed['motivo']}", color="#f59e0b", size=11)
+                    ft.Text(f"ðŸš¦ {limite_pubmed['motivo']}", color="#f59e0b", size=11)
                 )
                 page.update()
             else:
@@ -736,8 +710,8 @@ def main(page: ft.Page):
                         )
                         if busqueda_profunda:
                             contexto_pubmed = (
-                                "[NOTA DE BÚSQUEDA: no se encontraron resultados relevantes entre "
-                                f"2020 y {ANIO_FIN_RECIENTE}; la investigación se amplió a años anteriores.]\n\n"
+                                "[NOTA DE BÃšSQUEDA: no se encontraron resultados relevantes entre "
+                                f"2020 y {ANIO_FIN_RECIENTE}; la investigaciÃ³n se ampliÃ³ a aÃ±os anteriores.]\n\n"
                                 + contexto_pubmed
                             )
                         _completar_paso_proceso(fila_pubmed, t("pubmed_con_resultados", idioma_var[0], n=len(papers_relevantes)))
@@ -749,8 +723,8 @@ def main(page: ft.Page):
                         
                         _completar_paso_proceso(
                             fila_pubmed,
-                            "⚠️ La búsqueda de literatura falló (PubMed/Europe PMC/Semantic Scholar no "
-                            "respondieron) — la respuesta se basará solo en el conocimiento general del "
+                            "âš ï¸ La bÃºsqueda de literatura fallÃ³ (PubMed/Europe PMC/Semantic Scholar no "
+                            "respondieron) â€” la respuesta se basarÃ¡ solo en el conocimiento general del "
                             "modelo, sin papers verificados.",
                             error=True,
                         )
@@ -772,13 +746,13 @@ def main(page: ft.Page):
                             nombre for nombre, v in estado_busqueda["proveedores"].items() if v == "error"
                         )
                         columna_pasos.controls.append(
-                            ft.Text(f"⚠️ Proveedor(es) con falla esta búsqueda: {proveedores_caidos} "
-                                    "(los demás sí respondieron)", color="#f59e0b", size=10, italic=True)
+                            ft.Text(f"âš ï¸ Proveedor(es) con falla esta bÃºsqueda: {proveedores_caidos} "
+                                    "(los demÃ¡s sÃ­ respondieron)", color="#f59e0b", size=10, italic=True)
                         )
                         page.update()
                     if intentos_debug:
                         columna_pasos.controls.append(
-                            ft.Text("🔎 " + " | ".join(intentos_debug), color="#475569", size=10, italic=True)
+                            ft.Text("ðŸ”Ž " + " | ".join(intentos_debug), color="#475569", size=10, italic=True)
                         )
                         page.update()
                 except Exception as ex_pubmed:
@@ -789,7 +763,7 @@ def main(page: ft.Page):
                 if fragmentos_relevantes:
                     bloque_pdf = t("contexto_pdf", idioma_var[0]) + "\n"
                     for i, (similitud, fuente, frag_texto, tipo_texto) in enumerate(fragmentos_relevantes, start=1):
-                        ocr_tag = " · vía OCR" if tipo_texto == "ocr" else ""
+                        ocr_tag = " Â· vÃ­a OCR" if tipo_texto == "ocr" else ""
                         bloque_pdf += f"\n[F{i}] (Fuente: {fuente} | similitud: {similitud:.2f}{ocr_tag})\n{frag_texto}\n"
                 elif fragmentos_sesion:
                     bloque_pdf = "\n".join(fragmentos_sesion)
@@ -801,7 +775,7 @@ def main(page: ft.Page):
 
                 if fragmentos_relevantes:
                     columna_pasos.controls.append(
-                        ft.Text(f"📎 {t('fragmentos_usados', idioma_var[0], n=len(fragmentos_relevantes))}",
+                        ft.Text(f"ðŸ“Ž {t('fragmentos_usados', idioma_var[0], n=len(fragmentos_relevantes))}",
                                 color="#475569", size=11, italic=True)
                     )
                     page.update()
@@ -852,6 +826,11 @@ def main(page: ft.Page):
                     max_tokens=MAX_TOKENS_RESPUESTA,
                     stream=True
                 )
+                indicador_respuesta = indicador_streaming(
+                    t("generando_respuesta", idioma_var[0])
+                )
+                chat_view.controls.append(indicador_respuesta)
+                page.update()
                 fila_respuesta, ai_markdown = _burbuja_ai("", pregunta=texto)
                 chat_view.controls.append(fila_respuesta)
                 page.update()
@@ -866,11 +845,13 @@ def main(page: ft.Page):
                         if _contador_chunks % 3 == 0 or "\n" in delta:
                             page.update()
                 ai_markdown.value = full_response
+                if indicador_respuesta in chat_view.controls:
+                    chat_view.controls.remove(indicador_respuesta)
                 _completar_paso_proceso(fila_generando, t("respuesta_generada", idioma_var[0]))
                 page.update()
 
                 if detectar_citas_alucinadas(full_response, len(papers_relevantes), len(fragmentos_relevantes)):
-                    chat_view.controls.append(_tarjeta_aviso(
+                    chat_view.controls.append(tarjeta_aviso(
                         t("fuentes_sin_respuesta", idioma_var[0]), tipo="error"
                     ))
 
@@ -917,10 +898,10 @@ def main(page: ft.Page):
                         partes_invalidas.append(
                             "fragmentos " + ", ".join(f"[F{n}]" for n in citas_fuera_rango["fragmentos_invalidos"])
                         )
-                    chat_view.controls.append(_tarjeta_aviso(
-                        f"⚠️ La respuesta cita {', '.join(partes_invalidas)}, que no corresponden a "
-                        "ninguna fuente real de esta búsqueda — probablemente un número inventado "
-                        "por el modelo. No confíes en esa cita específica.",
+                    chat_view.controls.append(tarjeta_aviso(
+                        f"âš ï¸ La respuesta cita {', '.join(partes_invalidas)}, que no corresponden a "
+                        "ninguna fuente real de esta bÃºsqueda â€” probablemente un nÃºmero inventado "
+                        "por el modelo. No confÃ­es en esa cita especÃ­fica.",
                         tipo="error",
                     ))
 
@@ -934,17 +915,17 @@ def main(page: ft.Page):
                         ai_markdown.value = full_response
                         page.update()
                     mensaje_alerta = (
-                        "🤔 El modelo dijo que no encontró papers/evidencia, pero SÍ había "
+                        "ðŸ¤” El modelo dijo que no encontrÃ³ papers/evidencia, pero SÃ habÃ­a "
                         f"{len(papers_relevantes)} paper(s) y {len(fragmentos_relevantes)} fragmento(s) "
                         "reales disponibles este turno. "
-                        + ("Se quitó esa frase falsa del texto de arriba automáticamente — revisa el "
-                           "panel de Fuentes abajo, ahí están los papers reales que sí se usaron."
+                        + ("Se quitÃ³ esa frase falsa del texto de arriba automÃ¡ticamente â€” revisa el "
+                           "panel de Fuentes abajo, ahÃ­ estÃ¡n los papers reales que sÃ­ se usaron."
                            if se_limpio else
-                           "No se pudo limpiar automáticamente (el modelo la escribió distinto a lo "
-                           "esperado) — revisa el panel de Fuentes abajo, la frase de arriba no es "
+                           "No se pudo limpiar automÃ¡ticamente (el modelo la escribiÃ³ distinto a lo "
+                           "esperado) â€” revisa el panel de Fuentes abajo, la frase de arriba no es "
                            "confiable.")
                     )
-                    chat_view.controls.append(_tarjeta_aviso(mensaje_alerta, tipo="info"))
+                    chat_view.controls.append(tarjeta_aviso(mensaje_alerta, tipo="info"))
 
                 contradicciones = verificar_consistencia_fisiologica(texto, full_response)
                 if contradicciones:
@@ -956,9 +937,9 @@ def main(page: ft.Page):
                     ]
                     for c in contradicciones:
                         lineas_contradiccion.append(
-                            ft.Text(f"• {c['diagnostico']}: {c['explicacion']}", color="#fde68a", size=11)
+                            ft.Text(f"â€¢ {c['diagnostico']}: {c['explicacion']}", color="#fde68a", size=11)
                         )
-                    chat_view.controls.append(_tarjeta_aviso(
+                    chat_view.controls.append(tarjeta_aviso(
                         ft.Column(lineas_contradiccion, spacing=3), tipo="warning"
                     ))
 
@@ -990,8 +971,8 @@ def main(page: ft.Page):
                 if resumen_evidencia["disponible"]:
                     msg_asistente["_evidencia"] = resumen_evidencia
                     nivel_traducido = t_categoria(resumen_evidencia["nivel_mas_fuerte"], idioma_var[0])
-                    chat_view.controls.append(_tarjeta_aviso(
-                        "🏅 " + t(
+                    chat_view.controls.append(tarjeta_aviso(
+                        "ðŸ… " + t(
                             "badge_evidencia_citada", idioma_var[0],
                             nivel=nivel_traducido, n=resumen_evidencia["n_papers_citados"],
                         ),
@@ -1017,14 +998,14 @@ def main(page: ft.Page):
                 )
                 page.update()
             except Exception as ex:
-                chat_view.controls.append(_tarjeta_aviso(t("error_generico", idioma_var[0], error=ex), tipo="error"))
+                chat_view.controls.append(tarjeta_aviso(t("error_generico", idioma_var[0], error=ex), tipo="error"))
                 registrar_evento(
                     usuario_actual_id[0], "chat", modelo=MODELO_CHAT, estado="error",
                     latencia_ms=int((time.time() - tiempo_inicio_turno) * 1000), texto_consulta=texto,
                 )
                 page.update()
         else:
-            chat_view.controls.append(_tarjeta_aviso(t("api_no_configurado", idioma_var[0]), tipo="error"))
+            chat_view.controls.append(tarjeta_aviso(t("api_no_configurado", idioma_var[0]), tipo="error"))
             page.update()
 
     
@@ -1045,7 +1026,7 @@ def main(page: ft.Page):
 
         limite = verificar_limite(usuario_actual_id[0], "flashcards", idioma=idioma_var[0])
         if not limite["permitido"]:
-            txt_estado_flashcards.value = f"🚦 {limite['motivo']}"
+            txt_estado_flashcards.value = f"ðŸš¦ {limite['motivo']}"
             page.update()
             return
         registrar_solicitud(usuario_actual_id[0], "flashcards")
@@ -1102,7 +1083,7 @@ def main(page: ft.Page):
         tarjeta = flashcards_sesion[indice_flashcard[0]]
         subtitulo = t("tarjeta_de", idioma, n=indice_flashcard[0] + 1, t=len(flashcards_sesion))
         if tarjeta.get("tema"):
-            subtitulo += f" · {tarjeta['tema']}"
+            subtitulo += f" Â· {tarjeta['tema']}"
         controles = [
             ft.Text(subtitulo, size=12, color="#64748b"),
             ft.Container(
@@ -1173,7 +1154,7 @@ def main(page: ft.Page):
 
         limite = verificar_limite(usuario_actual_id[0], "examen", idioma=idioma_var[0])
         if not limite["permitido"]:
-            txt_estado_examen.value = f"🚦 {limite['motivo']}"
+            txt_estado_examen.value = f"ðŸš¦ {limite['motivo']}"
             page.update()
             return
         registrar_solicitud(usuario_actual_id[0], "examen")
@@ -1263,7 +1244,7 @@ def main(page: ft.Page):
 
         if respuesta_revelada_examen[0]:
             if pregunta_actual.get("explicacion"):
-                controles.append(ft.Text(f"💡 {pregunta_actual['explicacion']}", size=13, color="#94a3b8", italic=True))
+                controles.append(ft.Text(f"ðŸ’¡ {pregunta_actual['explicacion']}", size=13, color="#94a3b8", italic=True))
             controles.append(
                 ft.FilledButton(t("siguiente", idioma), on_click=siguiente_pregunta_examen,
                                  style=ft.ButtonStyle(bgcolor="#3b82f6", color="#ffffff"))
@@ -1321,11 +1302,11 @@ def main(page: ft.Page):
             controles.append(ft.Text(t("nivel_por_tema", idioma), size=13, color="#e2e8f0", weight=ft.FontWeight.BOLD))
             claves_nivel = {
                 "Necesita repaso": "nivel_necesita_repaso", "En progreso": "nivel_en_progreso",
-                "Dominado": "nivel_dominado", "Muy pocos datos aún": "nivel_pocos_datos",
+                "Dominado": "nivel_dominado", "Muy pocos datos aÃºn": "nivel_pocos_datos",
             }
             colores_nivel = {
                 "Necesita repaso": "#ef4444", "En progreso": "#f59e0b",
-                "Dominado": "#22c55e", "Muy pocos datos aún": "#64748b",
+                "Dominado": "#22c55e", "Muy pocos datos aÃºn": "#64748b",
             }
             for item in niveles:
                 color_nivel = colores_nivel.get(item["nivel"], "#94a3b8")
@@ -1368,7 +1349,7 @@ def main(page: ft.Page):
             )
 
         def _mostrar_error_calculadora(caja, mensaje):
-            caja.content = ft.Text(f"❌ {mensaje}", color="#ef4444", size=13)
+            caja.content = ft.Text(f"âŒ {mensaje}", color="#ef4444", size=13)
             caja.border = ft.border.all(1, "#ef4444")
             caja.visible = True
             page.update()
@@ -1459,7 +1440,7 @@ def main(page: ft.Page):
             egfr = calcular_egfr_ckd_epi(campo_edad_renal.value, campo_cr_renal.value, dropdown_sexo_renal.value, idioma=idioma)
             controles = [
                 ft.Text(t("resultado_cockcroft", idioma, valor=cg["valor_ml_min"]), size=14, weight=ft.FontWeight.BOLD, color="#f8fafc"),
-                ft.Text(t_categoria(cg["categoria"], idioma) + (f" · {cg['nota']}" if cg.get("nota") else ""), size=12, color="#94a3b8"),
+                ft.Text(t_categoria(cg["categoria"], idioma) + (f" Â· {cg['nota']}" if cg.get("nota") else ""), size=12, color="#94a3b8"),
             ]
             if "error" not in egfr:
                 controles.append(ft.Divider(height=6, color="#2a2b36"))
@@ -1533,13 +1514,13 @@ def main(page: ft.Page):
                 return
             if not r.get("encontrado"):
                 caja_ajuste.border = ft.border.all(1, "#f59e0b")
-                caja_ajuste.content = ft.Text(f"ℹ️ {r['mensaje']}", size=13, color="#fbbf24")
+                caja_ajuste.content = ft.Text(f"â„¹ï¸ {r['mensaje']}", size=13, color="#fbbf24")
                 caja_ajuste.visible = True
                 page.update()
                 return
             caja_ajuste.border = ft.border.all(1, "#2a2b36")
             caja_ajuste.content = ft.Column([
-                ft.Text(f"{r['farmaco']} — {r['banda']}", size=14, weight=ft.FontWeight.BOLD, color="#f8fafc"),
+                ft.Text(f"{r['farmaco']} â€” {r['banda']}", size=14, weight=ft.FontWeight.BOLD, color="#f8fafc"),
                 ft.Text(r["instruccion"], size=13, color="#94a3b8"),
                 ft.Text(t("referencia_educativa", idioma), size=11, color="#64748b", italic=True),
             ], spacing=2)
@@ -1616,7 +1597,7 @@ def main(page: ft.Page):
                 def click_analizar_ia(e, par=primer_par, caja=caja_ia):
                     r = analizar_interaccion_con_ia(par[0], par[1], idioma=idioma)
                     if not r["disponible"]:
-                        caja.content = ft.Text(f"❌ {r['diagnostico']}", size=12, color="#ef4444")
+                        caja.content = ft.Text(f"âŒ {r['diagnostico']}", size=12, color="#ef4444")
                     else:
                         caja.content = ft.Column([
                             ft.Text(
@@ -1699,6 +1680,12 @@ def main(page: ft.Page):
         on_change=cambiar_idioma,
         border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0",
     )
+    switch_tema = ft.Switch(
+        label="☾ / ☀",
+        value=True,
+        on_change=cambiar_tema,
+        tooltip="Cambiar tema claro/oscuro",
+    )
     switch_pubmed = ft.Switch(label=t("busqueda_pubmed", idioma_var[0]), value=False, on_change=cambiar_switch)
     dropdown_nivel_evidencia = ft.Dropdown(
         label=t("nivel_evidencia", idioma_var[0]),
@@ -1730,10 +1717,10 @@ def main(page: ft.Page):
 
     def aplicar_idioma_ui(idioma):
         """
-        Retraduce TODO lo que está siempre visible (sidebar + input del
-        chat) cuando cambia el idioma — antes solo se traducían las
+        Retraduce TODO lo que estÃ¡ siempre visible (sidebar + input del
+        chat) cuando cambia el idioma â€” antes solo se traducÃ­an las
         respuestas de la IA y las vistas que se reconstruyen (calculadoras,
-        examen, etc.), pero el sidebar se construye una sola vez, así que
+        examen, etc.), pero el sidebar se construye una sola vez, asÃ­ que
         necesita que le actualicemos cada control a mano.
         """
         btn_logout.tooltip = t("cerrar_sesion", idioma)
@@ -1792,6 +1779,7 @@ def main(page: ft.Page):
             txt_estado_pdf,
             ft.Divider(color="#1f212a"),
             dropdown_idioma,
+            switch_tema,
             ft.Divider(color="#1f212a"),
             switch_pubmed,
             dropdown_nivel_evidencia,
@@ -1833,19 +1821,27 @@ def main(page: ft.Page):
         border_radius=12
     )
 
+    contenido_principal = ft.Column([], expand=True)
+    layout_principal = ft.Row([], expand=True)
+    btn_sidebar, al_redimensionar = configurar_shell_responsive(
+        page, sidebar, contenido_principal, layout_principal
+    )
+
     def mostrar_app_principal():
-        texto_usuario_sidebar.value = f"👤 {usuario_actual_nombre[0]}"
+        texto_usuario_sidebar.value = f"ðŸ‘¤ {usuario_actual_nombre[0]}"
         page.controls.clear()
-        page.add(
-            ft.Row([
-                sidebar,
-                ft.VerticalDivider(width=1, color="#1f212a"),
-                ft.Column([
-                    chat_view,
-                    ft.Row([entrada, btn_enviar], spacing=10)
-                ], expand=True)
-            ], expand=True)
-        )
+        contenido_principal.controls = [
+            ft.Row([btn_sidebar], alignment=ft.MainAxisAlignment.START),
+            chat_view,
+            ft.Row([entrada, btn_enviar], spacing=10),
+        ]
+        layout_principal.controls = [
+            sidebar,
+            ft.VerticalDivider(width=1, color="#1f212a"),
+            contenido_principal,
+        ]
+        page.add(layout_principal)
+        al_redimensionar(None)
         page.update()
         try:
             actualizar_sidebar_historial()
@@ -1949,7 +1945,7 @@ def main(page: ft.Page):
             ft.Container(
                 content=ft.Column(
                     [
-                        ft.Text("✨ Medicine Study AI", size=26, weight=ft.FontWeight.BOLD, color="#f8fafc"),
+                        ft.Text("âœ¨ Medicine Study AI", size=26, weight=ft.FontWeight.BOLD, color="#f8fafc"),
                         ft.Container(height=10),
                         titulo_login,
                         campo_usuario_login,
