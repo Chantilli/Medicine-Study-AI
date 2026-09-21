@@ -447,7 +447,7 @@ def main(page: ft.Page):
             chat_view.controls.clear()
             chat_view.controls.append(
                 ft.Text(
-                    f"âœ¨ Medicine Study AI\n{t('bienvenida_subtitulo', idioma)}\n\n"
+                    f"Medicine Study AI\n{t('bienvenida_subtitulo', idioma)}\n\n"
                     f"(No se pudo cargar la pantalla de inicio completa: {ex})",
                     size=15, color="#e2e8f0",
                 )
@@ -1947,10 +1947,15 @@ def main(page: ft.Page):
 
     campo_usuario_login = ft.TextField(
         label=t("login_usuario", idioma_var[0]), width=300,
-        border_color="#1f212a", bgcolor="#16171d", autofocus=True
+        border_color="#2a2d3a", focused_border_color="#3b82f6",
+        bgcolor="#16171d", color="#f8fafc",
+        label_style=ft.TextStyle(color="#93c5fd"), autofocus=True
     )
     campo_password_login = ft.TextField(
-        label=t("login_contrasena", idioma_var[0]), width=300, border_color="#1f212a", bgcolor="#16171d",
+        label=t("login_contrasena", idioma_var[0]), width=300,
+        border_color="#2a2d3a", focused_border_color="#3b82f6",
+        bgcolor="#16171d", color="#f8fafc",
+        label_style=ft.TextStyle(color="#cbd5e1"),
         password=True, can_reveal_password=True
     )
     texto_error_login = ft.Text("", color="#ef4444", size=12)
@@ -2025,7 +2030,7 @@ def main(page: ft.Page):
             ft.Container(
                 content=ft.Column(
                     [
-                        ft.Text("âœ¨ Medicine Study AI", size=26, weight=ft.FontWeight.BOLD, color="#f8fafc"),
+                        ft.Text("Medicine Study AI", size=26, weight=ft.FontWeight.BOLD, color="#f8fafc"),
                         ft.Container(height=10),
                         titulo_login,
                         campo_usuario_login,
