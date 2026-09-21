@@ -18,7 +18,6 @@ import flet as ft
 import pypdf
 import bcrypt
 import numpy as np
-from sentence_transformers import SentenceTransformer
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 ruta_env = Path(__file__).parent / '.env'
@@ -30,10 +29,24 @@ except Exception:
     client = None
 
 
-try:
-    modelo_embeddings = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-except Exception:
-    modelo_embeddings = None
+_modelo_embeddings = None
+_modelo_embeddings_intentado = False
+
+
+def obtener_modelo_embeddings():
+    """Carga el modelo solo cuando una función realmente necesita embeddings."""
+    global _modelo_embeddings, _modelo_embeddings_intentado
+    if _modelo_embeddings_intentado:
+        return _modelo_embeddings
+    _modelo_embeddings_intentado = True
+    try:
+        from sentence_transformers import SentenceTransformer
+        _modelo_embeddings = SentenceTransformer(
+            "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+        )
+    except Exception:
+        _modelo_embeddings = None
+    return _modelo_embeddings
 
 TAMANO_FRAGMENTO = 800
 SOLAPAMIENTO_FRAGMENTO = 150
