@@ -191,7 +191,7 @@ test_calculadoras.py             Pruebas unitarias de las calculadoras clínicas
 
 - La pantalla de login no es multilingüe (ocurre antes de que exista una sesión con idioma seleccionado).
 - El benchmark clínico usa preguntas originales calibradas a nivel ENARM/USMLE, no preguntas reales de ningún examen (por derechos de autor) — es una aproximación, no una certificación.
-- `NCBI_API_KEY` y `SEMANTIC_SCHOLAR_API_KEY` son opcionales: sin ellas, la app sigue funcionando pero con los límites de tasa públicos compartidos de cada servicio.
+- `NCBI_API_KEY` y `SEMANTIC_SCHOLAR_API_KEY` son opcionales: sin ellas, la app sigue funcionando pero con los límites de tasa públicos compartidos de cada servicio.(En el Space de HF si incluye las API keys?
 - La cobertura de `pytest` por ahora se centra en las calculadoras clínicas; los demás módulos aún no tienen pruebas automatizadas.
 
 ## Cómo evaluar la precisión
