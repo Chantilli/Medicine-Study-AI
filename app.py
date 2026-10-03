@@ -8,9 +8,9 @@ módulos por responsabilidad — este archivo solo importa y arranca:
   ocr_pdf.py          OCR para PDFs escaneados
   pubmed_search.py    PubMed + Europe PMC, ranking, nivel de evidencia
   citas_evidencia.py  citas, trazabilidad, anti-alucinación, juez de factualidad
-  ui_helpers.py       tarjetas de Flet (papers, fuentes, badge de factualidad)
+  ui_helpers.py       utilidades visuales Qt (papers, fuentes, badge de factualidad)
   historial_utils.py  recorte de historial, título de chat
-  app_ui.py           la función main() de Flet (login + chat)
+  app_ui.py           ventana PySide6 (login + chat + calculadoras)
 
 Correr la app normal:      python app.py
 Self-test sin UI (PubMed): python app.py --test-pubmed "metformina diabetes tipo 2"
@@ -18,13 +18,13 @@ Self-test sin UI (PubMed): python app.py --test-pubmed "metformina diabetes tipo
 import os
 import sys
 import time
-import flet as ft
+from PySide6.QtWidgets import QApplication
 
 from config import UPLOAD_DIR
 from database import crear_usuario
 from pubmed_search import buscar_pubmed_estructurado, clasificar_evidencia
 from citas_evidencia import formatear_cita_vancouver, formatear_cita_apa
-from app_ui import main
+from app_ui import MainWindow
 
 
 if __name__ == "__main__" and "--test-pubmed" in sys.argv:
@@ -57,16 +57,8 @@ if __name__ == "__main__" and "--test-pubmed" in sys.argv:
     raise SystemExit(0)
 
 if __name__ == "__main__":
-   
-    if not os.environ.get("FLET_SECRET_KEY"):
-        import secrets
-        os.environ["FLET_SECRET_KEY"] = secrets.token_hex(32)
-   
-    puerto = int(os.environ.get("PORT", 7860))
-    ft.app(
-        target=main,
-        view=ft.AppView.WEB_BROWSER,
-        host="0.0.0.0",
-        port=puerto,
-        upload_dir=str(UPLOAD_DIR),
-    )
+    app = QApplication(sys.argv)
+    app.setApplicationName("Medicine Study AI")
+    ventana = MainWindow()
+    ventana.show()
+    raise SystemExit(app.exec())

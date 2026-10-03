@@ -83,7 +83,7 @@ Medicine Study AI es un chat de estudio médico que:
                               └────────────────────────────────────────────────────┘
 ```
 
-La UI (Flet) se apoya en tres módulos separados de la lógica de negocio — `ui_shell.py` (layout responsive), `ui_componentes.py` (piezas visuales reutilizables) y `ui_helpers.py` (tarjetas de papers, panel de fuentes, badge de factualidad) — para que `app_ui.py` no concentre toda la interfaz.
+La UI de escritorio PySide6 se apoya en tres módulos separados de la lógica de negocio — `ui_shell.py` (layout y compatibilidad), `ui_componentes.py` (widgets reutilizables) y `ui_helpers.py` (tarjetas de papers, panel de fuentes, badge de factualidad) — para que `app_ui.py` solo coordine eventos.
 
 ---
 
@@ -107,7 +107,7 @@ El proyecto se construyó incrementalmente. Cada fase es funcional por sí sola 
 
 ## Stack tecnológico
 
-- **UI**: [Flet](https://flet.dev) (Python → Flutter), con layout responsive para móvil
+- **UI**: [PySide6](https://doc.qt.io/qtforpython/) (Qt para Python), con login, chat, adjuntos PDF y calculadoras clínicas
 - **LLM**: [Groq](https://groq.com) (`openai/gpt-oss-120b` para chat/juez, `openai/gpt-oss-20b` para tareas auxiliares)
 - **Embeddings**: `sentence-transformers` (paraphrase-multilingual-MiniLM-L12-v2) para RAG y ranking semántico de papers
 - **Base de datos**: SQLite (usuarios, chats, papers, flashcards, exámenes, auditoría, feedback, límite de uso)
@@ -122,6 +122,27 @@ El proyecto se construyó incrementalmente. Cada fase es funcional por sí sola 
 
 ```bash
 pytest -q
+```
+
+## Instalación y ejecución local
+
+Requiere Python 3.11+ y un entorno con soporte gráfico Qt:
+
+```bash
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+# source .venv/bin/activate
+pip install -r requirements.txt
+python app.py
+```
+
+La interfaz abre como aplicación de escritorio. Para ejecutar únicamente la
+comprobación de búsqueda de PubMed sin abrir Qt:
+
+```bash
+python app.py --test-pubmed "metformina diabetes tipo 2"
 ```
 
 - El workflow `.github/workflows/tests.yml` instala `requirements.txt` y corre pytest en cada push y pull request.
@@ -144,7 +165,7 @@ pytest -q
 
 ```
 app.py                          Punto de entrada
-app_ui.py                       Vistas y chat principal de Flet
+app_ui.py                       Ventana PySide6: login, chat, PDF y calculadoras
 ui_shell.py                      Layout responsive (sidebar móvil/escritorio)
 ui_componentes.py                Componentes visuales reutilizables (avisos, chips, tarjetas)
 ui_helpers.py                    Tarjetas de papers, panel de fuentes, badge de factualidad
