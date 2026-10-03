@@ -9,8 +9,10 @@ módulos por responsabilidad — este archivo solo importa y arranca:
   pubmed_search.py    PubMed + Europe PMC, ranking, nivel de evidencia
   citas_evidencia.py  citas, trazabilidad, anti-alucinación, juez de factualidad
   ui_helpers.py       tarjetas de Flet (papers, fuentes, badge de factualidad)
+  ui_helpers.py       utilidades visuales Qt (papers, fuentes, badge de factualidad)
   historial_utils.py  recorte de historial, título de chat
   app_ui.py           la función main() de Flet (login + chat)
+  app_ui.py           ventana PySide6 (login + chat + calculadoras)
 
 Correr la app normal:      python app.py
 Self-test sin UI (PubMed): python app.py --test-pubmed "metformina diabetes tipo 2"
@@ -19,12 +21,14 @@ import os
 import sys
 import time
 import flet as ft
+from PySide6.QtWidgets import QApplication
 
 from config import UPLOAD_DIR
 from database import crear_usuario
 from pubmed_search import buscar_pubmed_estructurado, clasificar_evidencia
 from citas_evidencia import formatear_cita_vancouver, formatear_cita_apa
 from app_ui import main
+from app_ui import MainWindow
 
 
 if __name__ == "__main__" and "--test-pubmed" in sys.argv:
@@ -45,7 +49,7 @@ if __name__ == "__main__" and "--test-pubmed" in sys.argv:
         print(f"    APA:       {formatear_cita_apa(p)}")
         print()
 
-    
+
     papers_2, n_nuevos_2, total_2, debug_2, estado_2 = buscar_pubmed_estructurado(consulta_prueba, usuario_test)
     print(f"2ª búsqueda (dedup): {len(papers_2)} papers relevantes ({n_nuevos_2} nuevos) · {total_2} únicos")
     if n_nuevos_2 == 0 and len(papers_2) > 0:
@@ -70,3 +74,8 @@ if __name__ == "__main__":
         port=puerto,
         upload_dir=str(UPLOAD_DIR),
     )
+    app = QApplication(sys.argv)
+    app.setApplicationName("Medicine Study AI")
+    ventana = MainWindow()
+    ventana.show()
+    raise SystemExit(app.exec())
