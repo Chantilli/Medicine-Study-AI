@@ -5,10 +5,15 @@ reciben datos ya calculados (papers, fuentes, resultado del juez) y
 arman los controles — no hacen búsquedas ni llamadas a Groq.
 """
 import flet as ft
+"""Presentación Qt de fuentes y resultados, compatible con imports existentes."""
+from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
 from pubmed_search import clasificar_evidencia
 from citas_evidencia import formatear_cita_vancouver
 from traducciones import t, t_categoria
+from pubmed_search import clasificar_evidencia
+from traducciones import t_categoria
+
 
 def agregar_papers_a_chat(chat_view, page, papers, n_nuevos, total_unicos, idioma="es"):
     """
@@ -19,6 +24,20 @@ def agregar_papers_a_chat(chat_view, page, papers, n_nuevos, total_unicos, idiom
     """
     if not papers:
         return
+    panel = QFrame()
+    layout = QVBoxLayout(panel)
+    conocidos = len(papers) - n_nuevos
+    layout.addWidget(QLabel(
+        f"📚 Papers de PubMed — {n_nuevos} nuevos, {conocidos} ya conocidos · "
+        f"{total_unicos} únicos"
+    ))
+    for indice, paper in enumerate(papers, 1):
+        layout.addWidget(QLabel(f"[{indice}] {paper.get('titulo', 'Sin título')}"))
+        layout.addWidget(QLabel(formatear_cita_vancouver(paper)))
+        layout.addWidget(QLabel(t_categoria(
+            clasificar_evidencia(paper.get("tipos_publicacion", [])), idioma
+        )))
+    chat_view.addWidget(panel)
 
     n_conocidos = len(papers) - n_nuevos
     resumen_conteo = f"{n_nuevos} nuevos"
@@ -142,6 +161,12 @@ def construir_panel_fuentes(fuentes: list, idioma="es"):
                     padding=ft.Padding(0, 4, 0, 4),
                 )
             )
+    panel = QFrame()
+    layout = QVBoxLayout(panel)
+    layout.addWidget(QLabel(f"📚 Fuentes de esta respuesta ({len(fuentes)})"))
+    for fuente in fuentes:
+        layout.addWidget(QLabel(str(fuente)))
+    return panel
 
     return ft.ExpansionTile(
         title=ft.Text(f"📚 Fuentes de esta respuesta ({len(fuentes)})", size=13, weight=ft.FontWeight.BOLD, color="#e2e8f0"),
@@ -194,3 +219,8 @@ def anexar_badge_factualidad(chat_view, page, fact: dict):
         )
     )
     page.update()
+    if isinstance(fact, dict) and isinstance(fact.get("score"), (int, float)):
+        chat_view.addWidget(QLabel(
+            f"🎯 Factualidad estimada: {fact['score']:.0f}/100\n"
+            f"{fact.get('resumen', '')}"
+        ))
