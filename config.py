@@ -14,7 +14,6 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from groq import Groq
-import flet as ft
 import pypdf
 import bcrypt
 import numpy as np
