@@ -92,7 +92,7 @@ from clasificador_riesgo_clinico import (
 from traducciones import t, t_categoria
 try:
     from ui_componentes import (
-        tarjeta_aviso, indicador_carga, indicador_streaming,
+        PALETA, tarjeta_aviso, indicador_carga, indicador_streaming,
         chip_sugerencia, tarjeta_funcion, bloque_seccion,
     )
 except ModuleNotFoundError:
@@ -153,6 +153,13 @@ except ModuleNotFoundError:
             expand=expand,
         )
 
+    PALETA = {
+        "page": "#0b1120", "surface": "#111c2e", "surface_alt": "#16243a",
+        "surface_soft": "#1b2d46", "border": "#263b58", "text": "#f8fafc",
+        "muted": "#94a3b8", "primary": "#38bdf8", "primary_dark": "#075985",
+        "teal": "#2dd4bf",
+    }
+
 try:
     from ui_shell import configurar_shell_responsive
 except ModuleNotFoundError:
@@ -190,7 +197,10 @@ except ModuleNotFoundError:
 def main(page: ft.Page):
     page.title = "Medicine Study AI"
     page.theme_mode = ft.ThemeMode.DARK
-    page.bgcolor = "#111217"
+    page.bgcolor = "#0b1120"
+    page.padding = 0
+    page.spacing = 0
+    page.theme = ft.Theme(color_scheme_seed="#38bdf8", font_family="Inter")
     tema_oscuro = [True]
 
   
@@ -276,7 +286,7 @@ def main(page: ft.Page):
             ft.Column([
                 ft.Container(
                     content=ft.Text(texto, color="#f1f5f9", size=14, selectable=True),
-                    bgcolor="#17324d", border=ft.border.all(1, "#2c4a6e"),
+                    bgcolor="#123b5d", border=ft.border.all(1, "#25658d"),
                     border_radius=ft.BorderRadius(14, 14, 3, 14), padding=ft.Padding(14, 10, 14, 10),
                 ),
                 ft.Row(acciones, alignment=ft.MainAxisAlignment.END, spacing=0) if acciones else ft.Container(),
@@ -344,7 +354,7 @@ def main(page: ft.Page):
                     ]),
                     markdown_control,
                 ], spacing=2),
-                bgcolor="#1a1b23", border=ft.border.all(1, "#2a2b36"),
+                bgcolor=PALETA["surface"], border=ft.border.all(1, PALETA["border"]),
                 border_radius=ft.BorderRadius(14, 14, 14, 3), padding=ft.Padding(14, 10, 14, 12),
                 expand=True,
             ),
@@ -362,15 +372,15 @@ def main(page: ft.Page):
             ], spacing=6),
             controls=[ft.Container(content=columna_pasos, padding=ft.Padding(14, 2, 14, 10))],
             initially_expanded=False,
-            collapsed_bgcolor="#15161c",
-            bgcolor="#15161c",
-            shape=ft.RoundedRectangleBorder(radius=10),
+            collapsed_bgcolor=PALETA["surface_alt"],
+            bgcolor=PALETA["surface_alt"],
+            shape=ft.RoundedRectangleBorder(radius=12),
         )
         return panel, columna_pasos
 
     def _agregar_paso_proceso(columna_pasos, texto, en_progreso=True):
         icono = (
-            ft.ProgressRing(width=12, height=12, stroke_width=2, color="#3b82f6") if en_progreso
+            ft.ProgressRing(width=12, height=12, stroke_width=2, color=PALETA["primary"]) if en_progreso
             else ft.Icon(ft.Icons.CHECK_CIRCLE_OUTLINE, size=14, color="#22c55e")
         )
         fila = ft.Row([icono, ft.Text(texto, size=12, color="#94a3b8", italic=True, expand=True)], spacing=8)
@@ -429,14 +439,30 @@ def main(page: ft.Page):
         try:
             chat_view.controls.append(
                 ft.Column([
-                    ft.Container(height=30),
-                    ft.Icon(ft.Icons.MEDICAL_INFORMATION_OUTLINED, size=46, color="#3b82f6"),
-                    ft.Text("Medicine Study AI", size=24, weight=ft.FontWeight.BOLD, color="#f8fafc"),
+                    ft.Container(height=26),
+                    ft.Container(
+                        content=ft.Icon(ft.Icons.MEDICAL_INFORMATION_OUTLINED, size=40, color="#67e8f9"),
+                        bgcolor="#12304a",
+                        border_radius=18,
+                        padding=14,
+                    ),
+                    ft.Text("Medicine Study AI", size=28, weight=ft.FontWeight.BOLD, color="#f8fafc"),
                     ft.Text(
                         t("bienvenida_subtitulo", idioma),
-                        size=13, color="#94a3b8", text_align=ft.TextAlign.CENTER,
+                        size=14, color="#a9bad0", text_align=ft.TextAlign.CENTER,
                     ),
-                    ft.Container(height=12),
+                    ft.Container(height=14),
+                    ft.Container(
+                        content=ft.Row([
+                            ft.Icon(ft.Icons.VERIFIED_OUTLINED, size=16, color="#2dd4bf"),
+                            ft.Text("Evidencia clínica · Estudio responsable · 5 idiomas", size=11, color="#bae6fd"),
+                        ], alignment=ft.MainAxisAlignment.CENTER, spacing=8),
+                        bgcolor="#102d45",
+                        border=ft.border.all(1, "#1d5871"),
+                        border_radius=20,
+                        padding=ft.Padding(14, 8, 14, 8),
+                    ),
+                    ft.Container(height=10),
                     ft.Row([
                         tarjeta_funcion(ft.Icons.SEARCH, t("func_pubmed_titulo", idioma), t("func_pubmed_desc", idioma)),
                         tarjeta_funcion(ft.Icons.UPLOAD_FILE_OUTLINED, t("func_pdfs_titulo", idioma), t("func_pdfs_desc", idioma)),
@@ -484,7 +510,7 @@ def main(page: ft.Page):
     def cambiar_tema(e):
         tema_oscuro[0] = e.control.value
         page.theme_mode = ft.ThemeMode.DARK if tema_oscuro[0] else ft.ThemeMode.LIGHT
-        page.bgcolor = "#111217" if tema_oscuro[0] else "#f8fafc"
+        page.bgcolor = "#0b1120" if tema_oscuro[0] else "#f8fafc"
         sidebar.bgcolor = page.bgcolor
         page.update()
 
@@ -1740,14 +1766,22 @@ def main(page: ft.Page):
     entrada = ft.TextField(
         hint_text=t("entrada_hint", IDIOMA_POR_DEFECTO),
         expand=True,
-        border_color="#1f212a",
-        bgcolor="#16171d",
+        border_color=PALETA["border"],
+        focused_border_color=PALETA["primary"],
+        bgcolor=PALETA["surface"],
+        color=PALETA["text"],
+        content_padding=ft.Padding(16, 12, 10, 12),
         on_submit=enviar_mensaje
     )
 
     btn_enviar = ft.IconButton(
         icon=ft.Icons.SEND_ROUNDED,
-        icon_color="#3b82f6",
+        icon_color=PALETA["primary"],
+        tooltip="Enviar mensaje",
+        style=ft.ButtonStyle(
+            bgcolor={"": PALETA["surface_alt"], "hovered": PALETA["surface_soft"]},
+            shape=ft.RoundedRectangleBorder(radius=12),
+        ),
         on_click=enviar_mensaje
     )
 
@@ -1757,18 +1791,19 @@ def main(page: ft.Page):
         mostrar_login_screen()
 
    
-    texto_usuario_sidebar = ft.Text("", size=12, color="#64748b", expand=True, overflow=ft.TextOverflow.ELLIPSIS)
+    texto_usuario_sidebar = ft.Text("", size=12, color=PALETA["muted"], expand=True, overflow=ft.TextOverflow.ELLIPSIS)
 
     btn_logout = ft.IconButton(icon=ft.Icons.LOGOUT, icon_color="#ef4444", icon_size=16, tooltip=t("cerrar_sesion", idioma_var[0]), on_click=cerrar_sesion)
     texto_titulo_sidebar = ft.Text(t("sidebar_titulo", idioma_var[0]), size=20, weight=ft.FontWeight.BOLD, color="#f8fafc")
-    texto_nuevo_chat = ft.Text(t("nuevo_chat", idioma_var[0]), color="#3b82f6")
+    texto_nuevo_chat = ft.Text(t("nuevo_chat", idioma_var[0]), color=PALETA["primary"])
     texto_cargar_pdf = ft.Text(t("cargar_pdf", idioma_var[0]), color="#e2e8f0")
     dropdown_idioma = ft.Dropdown(
         label=t("idioma_respuesta", idioma_var[0]),
         value=IDIOMA_POR_DEFECTO,
         options=[ft.dropdown.Option(codigo, cfg["nombre"]) for codigo, cfg in IDIOMAS.items()],
         on_change=cambiar_idioma,
-        border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0",
+        border_color=PALETA["border"], focused_border_color=PALETA["primary"],
+        bgcolor=PALETA["surface"], color="#e2e8f0",
     )
     switch_tema = ft.Switch(
         label="☾ / ☀",
@@ -1782,7 +1817,8 @@ def main(page: ft.Page):
         value="todo",
         options=[ft.dropdown.Option(k, t(f"modo_evidencia_{k}", idioma_var[0])) for k in MODOS_EVIDENCIA],
         on_change=cambiar_modo_evidencia,
-        border_color="#1f212a", bgcolor="#16171d", color="#e2e8f0",
+        border_color=PALETA["border"], focused_border_color=PALETA["primary"],
+        bgcolor=PALETA["surface"], color="#e2e8f0",
     )
     switch_factualidad = ft.Switch(label=t("verificar_factualidad", idioma_var[0]), value=True, on_change=cambiar_switch_factualidad)
     texto_seccion_flashcards = ft.Text(t("seccion_flashcards", idioma_var[0]), size=12, color="#64748b", weight=ft.FontWeight.BOLD)
@@ -1853,10 +1889,13 @@ def main(page: ft.Page):
             bloque_seccion([
                 ft.FilledButton(
                     content=ft.Row(
-                        [ft.Icon(ft.Icons.ADD, color="#3b82f6"), texto_nuevo_chat],
+                        [ft.Icon(ft.Icons.ADD, color=PALETA["primary"]), texto_nuevo_chat],
                         alignment=ft.MainAxisAlignment.CENTER,
                     ),
-                    style=ft.ButtonStyle(bgcolor="#1f212a", shape=ft.RoundedRectangleBorder(radius=8)),
+                    style=ft.ButtonStyle(
+                        bgcolor={"": PALETA["surface_alt"], "hovered": PALETA["surface_soft"]},
+                        shape=ft.RoundedRectangleBorder(radius=10),
+                    ),
                     on_click=nuevo_chat_click,
                 ),
                 ft.FilledButton(
@@ -1912,10 +1951,10 @@ def main(page: ft.Page):
             ft.Text("Medicine Study AI v3.1", size=10, color="#475569"),
         ], spacing=8, scroll=ft.ScrollMode.AUTO),
         width=260,
-        bgcolor="#111217",
-        padding=15,
-        border=ft.BorderSide(1, "#1f212a"),
-        border_radius=12
+        bgcolor="#0b1120",
+        padding=18,
+        border=ft.BorderSide(1, PALETA["border"]),
+        border_radius=0
     )
 
     contenido_principal = ft.Column([], expand=True)
@@ -1930,19 +1969,19 @@ def main(page: ft.Page):
         contenido_principal.controls = [
             bloque_seccion(
                 [ft.Row([btn_sidebar], alignment=ft.MainAxisAlignment.START)],
-                bgcolor="#111217",
-                padding=0,
+                bgcolor="#0b1120",
+                padding=8,
             ),
             bloque_seccion([chat_view], expand=True),
             bloque_seccion(
                 [ft.Row([entrada, btn_enviar], spacing=10)],
-                bgcolor="#111217",
-                padding=0,
+                bgcolor="#0b1120",
+                padding=8,
             ),
         ]
         layout_principal.controls = [
             sidebar,
-            ft.VerticalDivider(width=1, color="#1f212a"),
+            ft.VerticalDivider(width=1, color=PALETA["border"]),
             contenido_principal,
         ]
         page.add(layout_principal)
@@ -2053,24 +2092,42 @@ def main(page: ft.Page):
         page.controls.clear()
         page.add(
             ft.Container(
-                content=ft.Column(
-                    [
-                        ft.Text("Medicine Study AI", size=26, weight=ft.FontWeight.BOLD, color="#f8fafc"),
-                        ft.Container(height=10),
-                        titulo_login,
-                        campo_usuario_login,
-                        campo_password_login,
-                        texto_error_login,
-                        btn_login,
-                        ft.TextButton(
-                            content=texto_toggle_login,
-                            on_click=alternar_modo_login,
-                        ),
-                    ],
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    spacing=12,
+                content=ft.Container(
+                    content=ft.Column(
+                        [
+                            ft.Container(
+                                content=ft.Icon(ft.Icons.MEDICAL_INFORMATION_OUTLINED, size=34, color="#67e8f9"),
+                                bgcolor="#12304a",
+                                border_radius=16,
+                                padding=12,
+                            ),
+                            ft.Text("Medicine Study AI", size=27, weight=ft.FontWeight.BOLD, color="#f8fafc"),
+                            ft.Text(
+                                "Tu espacio de estudio basado en evidencia",
+                                size=12, color="#94a3b8",
+                            ),
+                            ft.Divider(height=20, color="#263b58"),
+                            titulo_login,
+                            campo_usuario_login,
+                            campo_password_login,
+                            texto_error_login,
+                            btn_login,
+                            ft.TextButton(
+                                content=texto_toggle_login,
+                                on_click=alternar_modo_login,
+                            ),
+                        ],
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        spacing=12,
+                    ),
+                    width=390,
+                    padding=ft.Padding(34, 32, 34, 26),
+                    bgcolor="#111c2e",
+                    border=ft.border.all(1, "#263b58"),
+                    border_radius=24,
                 ),
                 alignment=ft.alignment.center,
+                bgcolor="#0b1120",
                 expand=True,
             )
         )
