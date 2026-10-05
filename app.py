@@ -9,10 +9,8 @@ módulos por responsabilidad — este archivo solo importa y arranca:
   pubmed_search.py    PubMed + Europe PMC, ranking, nivel de evidencia
   citas_evidencia.py  citas, trazabilidad, anti-alucinación, juez de factualidad
   ui_helpers.py       tarjetas de Flet (papers, fuentes, badge de factualidad)
-  ui_helpers.py       utilidades visuales Qt (papers, fuentes, badge de factualidad)
   historial_utils.py  recorte de historial, título de chat
   app_ui.py           la función main() de Flet (login + chat)
-  app_ui.py           ventana PySide6 (login + chat + calculadoras)
 
 Correr la app normal:      python app.py
 Self-test sin UI (PubMed): python app.py --test-pubmed "metformina diabetes tipo 2"
