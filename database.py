@@ -156,6 +156,7 @@ def inicializar_db():
             modelo TEXT,
             tokens_entrada INTEGER,
             tokens_salida INTEGER,
+            tokens_total INTEGER,
             estado TEXT DEFAULT 'ok',
             latencia_ms INTEGER,
             n_fuentes INTEGER,
@@ -165,6 +166,10 @@ def inicializar_db():
         )
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_auditoria_usuario_fecha ON auditoria_uso(usuario_id, fecha)")
+    cursor.execute("PRAGMA table_info(auditoria_uso)")
+    columnas_auditoria = [fila[1] for fila in cursor.fetchall()]
+    if "tokens_total" not in columnas_auditoria:
+        cursor.execute("ALTER TABLE auditoria_uso ADD COLUMN tokens_total INTEGER")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS feedback_respuestas (
@@ -270,4 +275,3 @@ def eliminar_chat_db(chat_id, usuario_id):
     conn.close()
 
 inicializar_db()
-
