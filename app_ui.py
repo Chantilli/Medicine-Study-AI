@@ -46,13 +46,35 @@ from citas_evidencia import (
     evaluar_factualidad, resumen_evidencia_citada,
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QThread, Signal, Slot, Qt
-from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QHBoxLayout,
-    QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
-    QPushButton, QPlainTextEdit, QSpinBox, QStackedWidget, QTabWidget,
-    QVBoxLayout, QWidget,
-)
+if os.environ.get("APP_UI_MODE", "web").strip().lower() == "qt":
+    from PySide6.QtCore import QObject, QThread, Signal, Slot, Qt
+    from PySide6.QtWidgets import (
+        QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QHBoxLayout,
+        QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
+        QPushButton, QPlainTextEdit, QSpinBox, QStackedWidget, QTabWidget,
+        QVBoxLayout, QWidget,
+    )
+else:
+    class _WebOnlyQtObject:
+        pass
+
+    class _WebOnlySignal:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    def _web_only_slot(*args, **kwargs):
+        return lambda function: function
+
+    QObject = QThread = QCheckBox = QComboBox = QFileDialog = QFormLayout = (
+        QHBoxLayout
+    ) = QLabel = QLineEdit = QListWidget = QListWidgetItem = QMainWindow = (
+        QMessageBox
+    ) = QPushButton = QPlainTextEdit = QSpinBox = QStackedWidget = QTabWidget = (
+        QVBoxLayout
+    ) = QWidget = _WebOnlyQtObject
+    Signal = _WebOnlySignal
+    Slot = _web_only_slot
+    Qt = None
 
 try:
     from citas_evidencia import normalizar_citas_pmid
