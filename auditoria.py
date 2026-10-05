@@ -35,6 +35,7 @@ def _hash_consulta(texto: str):
 
 def registrar_evento(usuario_id, operacion: str, modelo: str = None,
                       tokens_entrada: int = None, tokens_salida: int = None,
+                      tokens_total: int = None,
                       estado: str = "ok", latencia_ms: int = None,
                       n_fuentes: int = None, texto_consulta: str = None) -> None:
     """
@@ -48,9 +49,10 @@ def registrar_evento(usuario_id, operacion: str, modelo: str = None,
         cursor.execute(
             """INSERT INTO auditoria_uso
                (usuario_id, operacion, modelo, tokens_entrada, tokens_salida,
-                estado, latencia_ms, n_fuentes, hash_consulta, longitud_consulta)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                tokens_total, estado, latencia_ms, n_fuentes, hash_consulta, longitud_consulta)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (usuario_id, operacion, modelo, tokens_entrada, tokens_salida,
+             tokens_total,
              estado, latencia_ms, n_fuentes, _hash_consulta(texto_consulta),
              len(texto_consulta) if texto_consulta else None)
         )
@@ -58,6 +60,24 @@ def registrar_evento(usuario_id, operacion: str, modelo: str = None,
         conn.close()
     except Exception:
         pass
+
+
+def registrar_uso_respuesta(usuario_id, operacion, respuesta, modelo=None):
+    """Persiste usage real de una respuesta Groq sin guardar su contenido."""
+    usage = getattr(respuesta, "usage", None)
+    if usage is None and isinstance(respuesta, dict):
+        usage = respuesta.get("usage")
+    if usage is None:
+        return
+    def valor(nombre):
+        return usage.get(nombre) if isinstance(usage, dict) else getattr(usage, nombre, None)
+    entrada = valor("prompt_tokens") or valor("input_tokens")
+    salida = valor("completion_tokens") or valor("output_tokens")
+    total = valor("total_tokens")
+    registrar_evento(
+        usuario_id, operacion, modelo=modelo, tokens_entrada=entrada,
+        tokens_salida=salida, tokens_total=total,
+    )
 
 
 def obtener_resumen_auditoria(usuario_id=None, dias: int = 7) -> list:
@@ -76,7 +96,7 @@ def obtener_resumen_auditoria(usuario_id=None, dias: int = 7) -> list:
     if usuario_id is not None:
         cursor.execute(
             """SELECT operacion, COUNT(*) AS n, AVG(latencia_ms) AS latencia_prom,
-                      SUM(COALESCE(tokens_entrada, 0) + COALESCE(tokens_salida, 0)) AS tokens_total,
+                      SUM(COALESCE(tokens_total, COALESCE(tokens_entrada, 0) + COALESCE(tokens_salida, 0))) AS tokens_total,
                       SUM(CASE WHEN estado != 'ok' THEN 1 ELSE 0 END) AS n_errores
                FROM auditoria_uso WHERE usuario_id = ? AND fecha >= ?
                GROUP BY operacion ORDER BY n DESC""",
@@ -85,7 +105,7 @@ def obtener_resumen_auditoria(usuario_id=None, dias: int = 7) -> list:
     else:
         cursor.execute(
             """SELECT operacion, COUNT(*) AS n, AVG(latencia_ms) AS latencia_prom,
-                      SUM(COALESCE(tokens_entrada, 0) + COALESCE(tokens_salida, 0)) AS tokens_total,
+                      SUM(COALESCE(tokens_total, COALESCE(tokens_entrada, 0) + COALESCE(tokens_salida, 0))) AS tokens_total,
                       SUM(CASE WHEN estado != 'ok' THEN 1 ELSE 0 END) AS n_errores
                FROM auditoria_uso WHERE fecha >= ?
                GROUP BY operacion ORDER BY n DESC""",
