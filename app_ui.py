@@ -91,9 +91,9 @@ from clasificador_riesgo_clinico import (
 )
 from traducciones import t, t_categoria
 try:
-    from ui_components import (
+    from ui_componentes import (
         tarjeta_aviso, indicador_carga, indicador_streaming,
-        chip_sugerencia, tarjeta_funcion,
+        chip_sugerencia, tarjeta_funcion, bloque_seccion,
     )
 except ModuleNotFoundError:
     # Compatibilidad con despliegues donde solo se copia app_ui.py.
@@ -141,6 +141,16 @@ except ModuleNotFoundError:
             ], spacing=4),
             bgcolor="#15161c", border=ft.border.all(1, "#22232d"),
             border_radius=12, padding=14, width=220,
+        )
+
+    def bloque_seccion(controles, *, bgcolor="#15161c", padding=10, expand=False):
+        return ft.Container(
+            content=ft.Column(controles, spacing=8),
+            bgcolor=bgcolor,
+            border=ft.border.all(1, "#22232d"),
+            border_radius=10,
+            padding=padding,
+            expand=expand,
         )
 
 try:
@@ -1833,67 +1843,74 @@ def main(page: ft.Page):
 
     sidebar = ft.Container(
         content=ft.Column([
-            texto_titulo_sidebar,
-            ft.Row(
-                [texto_usuario_sidebar, btn_logout],
-                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            ),
-            ft.Divider(color="#1f212a"),
-            ft.FilledButton(
-                content=ft.Row(
-                    [ft.Icon(ft.Icons.ADD, color="#3b82f6"), texto_nuevo_chat],
-                    alignment=ft.MainAxisAlignment.CENTER,
+            bloque_seccion([
+                ft.Row(
+                    [texto_titulo_sidebar, btn_logout],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 ),
-                style=ft.ButtonStyle(bgcolor="#1f212a", shape=ft.RoundedRectangleBorder(radius=8)),
-                on_click=nuevo_chat_click,
-            ),
-            ft.Divider(color="#1f212a"),
-            ft.FilledButton(
-                content=ft.Row(
-                    [ft.Icon(ft.Icons.UPLOAD_FILE, color="#e2e8f0"), texto_cargar_pdf],
-                    alignment=ft.MainAxisAlignment.CENTER,
+                texto_usuario_sidebar,
+            ]),
+            bloque_seccion([
+                ft.FilledButton(
+                    content=ft.Row(
+                        [ft.Icon(ft.Icons.ADD, color="#3b82f6"), texto_nuevo_chat],
+                        alignment=ft.MainAxisAlignment.CENTER,
+                    ),
+                    style=ft.ButtonStyle(bgcolor="#1f212a", shape=ft.RoundedRectangleBorder(radius=8)),
+                    on_click=nuevo_chat_click,
                 ),
-                style=ft.ButtonStyle(bgcolor="#1e293b", shape=ft.RoundedRectangleBorder(radius=8)),
-                on_click=abrir_buscador_archivos,  
-            ),
-            txt_estado_pdf,
-            ft.Divider(color="#1f212a"),
-            dropdown_idioma,
-            switch_tema,
-            ft.Divider(color="#1f212a"),
-            switch_pubmed,
-            dropdown_nivel_evidencia,
-            switch_factualidad,
-            ft.Divider(color="#1f212a"),
-            texto_seccion_flashcards,
-            btn_generar_flashcards,
-            txt_estado_flashcards,
-            ft.FilledButton(
-                content=txt_contador_flashcards,
-                style=ft.ButtonStyle(bgcolor="#1e1b2e", shape=ft.RoundedRectangleBorder(radius=8)),
-                on_click=iniciar_repaso,
-            ),
-            ft.Divider(color="#1f212a"),
-            texto_seccion_examen,
-            btn_generar_examen,
-            txt_estado_examen,
-            ft.Divider(color="#1f212a"),
-            ft.FilledButton(
-                content=texto_btn_progreso,
-                style=ft.ButtonStyle(bgcolor="#1e1b2e", shape=ft.RoundedRectangleBorder(radius=8)),
-                on_click=mostrar_vista_progreso,
-            ),
-            ft.Divider(color="#1f212a"),
-            ft.FilledButton(
-                content=texto_btn_calculadoras,
-                style=ft.ButtonStyle(bgcolor="#1e1b2e", shape=ft.RoundedRectangleBorder(radius=8)),
-                on_click=mostrar_vista_calculadoras,
-            ),
-            ft.Divider(color="#1f212a"),
-            texto_historial_titulo,
-            ft.Container(content=lista_historial_ui, expand=True),
-            ft.Text("Medicine Study AI v3.1", size=10, color="#475569")
-        ], scroll=ft.ScrollMode.AUTO),
+                ft.FilledButton(
+                    content=ft.Row(
+                        [ft.Icon(ft.Icons.UPLOAD_FILE, color="#e2e8f0"), texto_cargar_pdf],
+                        alignment=ft.MainAxisAlignment.CENTER,
+                    ),
+                    style=ft.ButtonStyle(bgcolor="#1e293b", shape=ft.RoundedRectangleBorder(radius=8)),
+                    on_click=abrir_buscador_archivos,
+                ),
+                txt_estado_pdf,
+            ]),
+            bloque_seccion([
+                dropdown_idioma,
+                switch_tema,
+            ]),
+            bloque_seccion([
+                switch_pubmed,
+                dropdown_nivel_evidencia,
+                switch_factualidad,
+            ]),
+            bloque_seccion([
+                texto_seccion_flashcards,
+                btn_generar_flashcards,
+                txt_estado_flashcards,
+                ft.FilledButton(
+                    content=txt_contador_flashcards,
+                    style=ft.ButtonStyle(bgcolor="#1e1b2e", shape=ft.RoundedRectangleBorder(radius=8)),
+                    on_click=iniciar_repaso,
+                ),
+            ]),
+            bloque_seccion([
+                texto_seccion_examen,
+                btn_generar_examen,
+                txt_estado_examen,
+            ]),
+            bloque_seccion([
+                ft.FilledButton(
+                    content=texto_btn_progreso,
+                    style=ft.ButtonStyle(bgcolor="#1e1b2e", shape=ft.RoundedRectangleBorder(radius=8)),
+                    on_click=mostrar_vista_progreso,
+                ),
+                ft.FilledButton(
+                    content=texto_btn_calculadoras,
+                    style=ft.ButtonStyle(bgcolor="#1e1b2e", shape=ft.RoundedRectangleBorder(radius=8)),
+                    on_click=mostrar_vista_calculadoras,
+                ),
+            ]),
+            bloque_seccion([
+                texto_historial_titulo,
+                ft.Container(content=lista_historial_ui, expand=True),
+            ], expand=True),
+            ft.Text("Medicine Study AI v3.1", size=10, color="#475569"),
+        ], spacing=8, scroll=ft.ScrollMode.AUTO),
         width=260,
         bgcolor="#111217",
         padding=15,
@@ -1911,9 +1928,17 @@ def main(page: ft.Page):
         texto_usuario_sidebar.value = f"👤 {usuario_actual_nombre[0]}"
         page.controls.clear()
         contenido_principal.controls = [
-            ft.Row([btn_sidebar], alignment=ft.MainAxisAlignment.START),
-            chat_view,
-            ft.Row([entrada, btn_enviar], spacing=10),
+            bloque_seccion(
+                [ft.Row([btn_sidebar], alignment=ft.MainAxisAlignment.START)],
+                bgcolor="#111217",
+                padding=0,
+            ),
+            bloque_seccion([chat_view], expand=True),
+            bloque_seccion(
+                [ft.Row([entrada, btn_enviar], spacing=10)],
+                bgcolor="#111217",
+                padding=0,
+            ),
         ]
         layout_principal.controls = [
             sidebar,
