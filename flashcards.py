@@ -24,7 +24,7 @@ import sqlite3
 from datetime import date, timedelta
 
 from database import DB_PATH
-from config import client, MODELO_AUXILIAR
+from config import client, MODELO_AUXILIAR, llamar_modelo_auxiliar
 
 
 def crear_flashcard(usuario_id, pregunta: str, respuesta: str, tema: str = None, fuente: str = None) -> int:
@@ -176,7 +176,8 @@ def generar_flashcards_con_ia(usuario_id, texto_fuente: str, tema: str = None, f
         return [], "No había texto fuente para generar flashcards."
     plantilla = _INSTRUCCIONES_FLASHCARDS_POR_IDIOMA.get(idioma, _INSTRUCCIONES_FLASHCARDS_POR_IDIOMA["es"])
     try:
-        respuesta = client.chat.completions.create(
+        respuesta = llamar_modelo_auxiliar(
+            "generacion_flashcards",
             model=MODELO_AUXILIAR,
             messages=[
                 {"role": "system", "content": plantilla.format(n=n)},
