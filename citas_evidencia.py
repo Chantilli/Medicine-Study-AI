@@ -7,7 +7,11 @@ fisiológica. También el juez de factualidad (LLM-as-judge) vía Groq.
 import re
 import json
 
-from config import client, MODELO_JUEZ, MAX_TOKENS_JUEZ, MAX_CHARS_EVAL_CONTEXTO, MAX_CHARS_ABSTRACT_CONTEXTO
+from config import (
+    client, MODELO_JUEZ, MAX_TOKENS_JUEZ, MAX_TOKENS_REVISION,
+    MAX_CHARS_EVAL_CONTEXTO, MAX_CHARS_ABSTRACT_CONTEXTO,
+    llamar_modelo_auxiliar,
+)
 from pubmed_search import clasificar_evidencia, _ORDEN_JERARQUIA_EVIDENCIA
 from traducciones import t, t_categoria
 
@@ -411,12 +415,15 @@ def eliminar_referencias_huerfanas_por_id(respuesta: str) -> str:
 def revisar_respuesta_con_ia(
     respuesta: str, contexto: str, idioma: str = "es"
 ) -> str:
-    """Hace una pasada final dedicada exclusivamente a fidelidad y citas."""
-    if not client or not contexto.strip() or not respuesta.strip():
+    """Valida citas y contradicciones en una sola pasada condicionada."""
+    if not contexto.strip() or not respuesta.strip():
         return respuesta
     prompt = f"""
 Eres un revisor estricto de respuestas médicas educativas.
-Corrige la respuesta BORRADOR usando únicamente el CONTEXTO DE FUENTES.
+Primero identifica problemas reales y después corrige SOLO si los hay.
+Devuelve EXCLUSIVAMENTE JSON válido con las claves:
+{{"problemas": ["..."], "respuesta_corregida": "..."}}
+Si no hay problemas, devuelve una lista vacía y deja la respuesta igual.
 
 Reglas obligatorias:
 1. Los únicos IDs válidos son los que aparecen literalmente como
@@ -448,8 +455,7 @@ Reglas obligatorias:
    nunca antes de la onda P. La eyección rápida corresponde al ST, la reducida
    al inicio de T hasta aproximadamente su pico y la relajación al pico hasta
    el final de T.
-6. Conserva la estructura y el idioma del borrador ({idioma}), pero devuelve
-   únicamente la respuesta corregida, sin comentarios sobre la revisión.
+6. Conserva la estructura y el idioma del borrador ({idioma}).
 7. No escribas una sección de referencias. El sistema la reconstruirá desde
    los IDs citados después de esta pasada.
 
@@ -460,7 +466,8 @@ BORRADOR:
 {respuesta}
 """
     try:
-        resultado = client.chat.completions.create(
+        resultado = llamar_modelo_auxiliar(
+            "revision_evidencia",
             model=MODELO_JUEZ,
             messages=[
                 {
@@ -470,10 +477,14 @@ BORRADOR:
                 {"role": "user", "content": prompt},
             ],
             temperature=0.0,
-            max_tokens=MAX_TOKENS_JUEZ,
+            max_tokens=MAX_TOKENS_REVISION,
         )
-        corregida = resultado.choices[0].message.content
-        return corregida.strip() if corregida and corregida.strip() else respuesta
+        datos = _parsear_json_juez(resultado.choices[0].message.content or "")
+        if not isinstance(datos, dict):
+            return respuesta
+        problemas = datos.get("problemas") or []
+        corregida = (datos.get("respuesta_corregida") or "").strip()
+        return corregida if problemas and corregida else respuesta
     except Exception:
         return respuesta
 
@@ -481,49 +492,8 @@ BORRADOR:
 def auditar_contradicciones_evidencia(
     respuesta: str, contexto: str, idioma: str = "es"
 ) -> str:
-    """Segunda pasada para conflictos entre fuentes y errores de clasificación."""
-    if not client or not contexto.strip() or not respuesta.strip():
-        return respuesta
-    prompt = f"""
-Audita esta respuesta médica contra TODO el contexto de fuentes.
-No uses conocimiento externo para inventar datos, pero sí detecta conflictos
-internos entre las fuentes. Devuelve solo la respuesta corregida.
-
-Reglas:
-- Si dos fuentes discrepan en edad pico, incidencia, prevalencia, fechas o
-  cualquier cifra, conserva la atribución a cada fuente y declara la
-  discrepancia; no presentes una fuente aislada como verdad universal.
-- Da prioridad a estudios primarios directamente relevantes y a la
-  convergencia de varias fuentes, pero no borres una fuente discordante:
-  márcala como resultado discrepante o posible error de fuente.
-- "Leucemia aguda" no incluye CML/LMC. CML es crónica; sepárala en
-  "Fuera de alcance (contexto relacionado)" o elimínala.
-- MRD puede describirse como predictor pronóstico independiente potente,
-  no como "método más fiable" salvo que una fuente lo diga literalmente.
-- No inventes títulos, autores, DOI, PMID, números de referencia ni datos.
-- Las referencias deben corresponder exactamente a las citas del cuerpo.
-- Conserva el idioma {idioma}, las citas PMID/DOI y las comillas directas.
-
-CONTEXTO:
-{contexto}
-
-RESPUESTA:
-{respuesta}
-"""
-    try:
-        resultado = client.chat.completions.create(
-            model=MODELO_JUEZ,
-            messages=[
-                {"role": "system", "content": "Eres un auditor de contradicciones biomédicas."},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.0,
-            max_tokens=MAX_TOKENS_JUEZ,
-        )
-        corregida = resultado.choices[0].message.content
-        return corregida.strip() if corregida and corregida.strip() else respuesta
-    except Exception:
-        return respuesta
+    """Compatibilidad de API: la auditoría se consolidó en la revisión única."""
+    return revisar_respuesta_con_ia(respuesta, contexto, idioma)
 
 _PATRONES_NEGACION_EVIDENCIA = [
     r"no encontr[ée] papers",
@@ -845,7 +815,7 @@ def evaluar_factualidad(respuesta: str, contexto_fuentes: str):
     Devuelve un dict {"score", "afirmaciones", "resumen"} o None si el
     juez no está disponible o falla — nunca interrumpe el flujo del chat.
     """
-    if not client or not contexto_fuentes.strip():
+    if not contexto_fuentes.strip():
         return None
     prompt = (
         "Eres un juez médico riguroso. Compara CADA afirmación clínica de la "
@@ -867,7 +837,8 @@ def evaluar_factualidad(respuesta: str, contexto_fuentes: str):
         f"=== RESPUESTA DEL ASISTENTE ===\n{respuesta}"
     )
     try:
-        respuesta_juez = client.chat.completions.create(
+        respuesta_juez = llamar_modelo_auxiliar(
+            "evaluacion_factualidad",
             model=MODELO_JUEZ,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
