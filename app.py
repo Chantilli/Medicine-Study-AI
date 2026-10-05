@@ -63,13 +63,26 @@ def run_web():
         os.environ["FLET_SECRET_KEY"] = secrets.token_hex(32)
 
     puerto = int(os.environ.get("PORT", 7860))
-    ft.app(
-        target=main,
-        view=ft.AppView.WEB_BROWSER,
-        host="0.0.0.0",
-        port=puerto,
-        upload_dir=str(UPLOAD_DIR),
-    )
+    # Flet 0.28 exposed the launcher as ``app``; current releases use
+    # ``run``. Keep the fallback so local and hosted environments stay
+    # compatible while preserving the same web configuration.
+    lanzador_legacy = getattr(ft, "app", None)
+    if lanzador_legacy:
+        lanzador_legacy(
+            target=main,
+            view=ft.AppView.WEB_BROWSER,
+            host="0.0.0.0",
+            port=puerto,
+            upload_dir=str(UPLOAD_DIR),
+        )
+    else:
+        ft.run(
+            main,
+            view=ft.AppView.WEB_BROWSER,
+            host="0.0.0.0",
+            port=puerto,
+            upload_dir=str(UPLOAD_DIR),
+        )
 
 
 def run_qt():
