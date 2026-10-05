@@ -1,7 +1,5 @@
 """Componentes visuales pequeños y reutilizables para la interfaz Flet."""
 import flet as ft
-"""Componentes Qt reutilizables y compatibles con imports históricos."""
-from PySide6.QtWidgets import QFrame, QLabel, QProgressBar, QPushButton, QVBoxLayout
 
 
 def tarjeta_aviso(contenido, tipo="info"):
@@ -21,11 +19,6 @@ def tarjeta_aviso(contenido, tipo="info"):
         border_radius=8,
         padding=10,
     )
-    widget = QFrame()
-    widget.setProperty("tipo", tipo)
-    layout = QVBoxLayout(widget)
-    layout.addWidget(contenido if hasattr(contenido, "setText") else QLabel(str(contenido)))
-    return widget
 
 
 def indicador_carga(texto):
@@ -36,11 +29,6 @@ def indicador_carga(texto):
         ],
         spacing=8,
     )
-    widget = QFrame()
-    layout = QVBoxLayout(widget)
-    layout.addWidget(QProgressBar())
-    layout.addWidget(QLabel(texto))
-    return widget
 
 
 def indicador_streaming(texto):
@@ -52,7 +40,6 @@ def indicador_streaming(texto):
         ],
         spacing=8,
     )
-    return indicador_carga(texto)
 
 
 def chip_sugerencia(texto, on_click):
@@ -65,9 +52,6 @@ def chip_sugerencia(texto, on_click):
         on_click=on_click,
         ink=True,
     )
-    boton = QPushButton(texto)
-    boton.clicked.connect(on_click)
-    return boton
 
 
 def tarjeta_funcion(icono, titulo, descripcion):
@@ -86,9 +70,3 @@ def tarjeta_funcion(icono, titulo, descripcion):
         padding=14,
         width=220,
     )
-    widget = QFrame()
-    layout = QVBoxLayout(widget)
-    layout.addWidget(QLabel(str(icono)))
-    layout.addWidget(QLabel(titulo))
-    layout.addWidget(QLabel(descripcion))
-    return widget
