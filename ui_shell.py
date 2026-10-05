@@ -29,14 +29,18 @@ def configurar_shell_responsive(
 
     boton_menu = ft.IconButton(
         icon=ft.Icons.MENU,
-        icon_color="#3b82f6",
+        icon_color="#38bdf8",
         tooltip="Mostrar u ocultar menú",
         on_click=alternar_sidebar,
+        style=ft.ButtonStyle(
+            bgcolor={"": "#16243a", "hovered": "#1d3856"},
+            shape=ft.RoundedRectangleBorder(radius=10),
+        ),
     )
     page.on_resized = al_redimensionar
     layout_principal.controls = [
         sidebar,
-        ft.VerticalDivider(width=1, color="#1f212a"),
+        ft.VerticalDivider(width=1, color="#263b58"),
         contenido_principal,
     ]
     return boton_menu, al_redimensionar
