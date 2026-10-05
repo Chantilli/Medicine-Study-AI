@@ -20,7 +20,7 @@ al resto de la app — separar "evidencia curada verificable" de
 """
 import unicodedata
 
-from config import client, MODELO_AUXILIAR
+from config import client, MODELO_AUXILIAR, llamar_modelo_auxiliar
 from traducciones import t
 
 
@@ -348,7 +348,8 @@ def analizar_interaccion_con_ia(farmaco_a: str, farmaco_b: str, idioma: str = "e
         return {"disponible": False, "texto": "", "diagnostico": t("groq_no_configurado", idioma)}
     instruccion = _INSTRUCCION_ANALISIS_IA_POR_IDIOMA.get(idioma, _INSTRUCCION_ANALISIS_IA_POR_IDIOMA["es"])
     try:
-        respuesta = client.chat.completions.create(
+        respuesta = llamar_modelo_auxiliar(
+            "analisis_interaccion",
             model=MODELO_AUXILIAR,
             messages=[
                 {"role": "system", "content": instruccion},
