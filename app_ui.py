@@ -13,7 +13,7 @@ import flet as ft
 from config import (
     client, SYSTEM_PROMPT, UPLOAD_DIR, MAX_CARACTERES_BLOQUE,
     MODELO_CHAT, MODELO_AUXILIAR, MAX_TOKENS_RESPUESTA, construir_system_prompt,
-    seleccionar_modelo_chat,
+    seleccionar_modelo_chat, crear_completions_streaming,
     obtener_modelo_embeddings,
     IDIOMAS, IDIOMA_POR_DEFECTO, MAX_PDF_BYTES, MAX_PDF_PAGINAS,
 )
@@ -952,13 +952,13 @@ def main(page: ft.Page):
 
                 fila_generando = _agregar_paso_proceso(columna_pasos, t("generando_respuesta", idioma_var[0]))
 
-                response_stream = client.chat.completions.create(
+                response_stream = crear_completions_streaming(
+                    client,
                     model=modelo_chat_turno,
                     messages=mensajes_para_groq,
                     temperature=0.0,
                     max_tokens=MAX_TOKENS_RESPUESTA,
                     stream=True,
-                    stream_options={"include_usage": True},
                 )
                 indicador_respuesta = indicador_streaming(
                     t("generando_respuesta", idioma_var[0])
