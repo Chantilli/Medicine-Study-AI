@@ -16,7 +16,7 @@ import json
 import sqlite3
 
 from database import DB_PATH
-from config import client, MODELO_AUXILIAR
+from config import client, MODELO_AUXILIAR, llamar_modelo_auxiliar
 
 
 def crear_pregunta_examen(usuario_id, pregunta: str, opciones: list, respuesta_correcta: int,
@@ -186,7 +186,8 @@ def generar_examen_con_ia(usuario_id, texto_fuente: str, tema: str = None, fuent
         return [], "No había texto fuente para generar el examen."
     plantilla = _INSTRUCCIONES_EXAMEN_POR_IDIOMA.get(idioma, _INSTRUCCIONES_EXAMEN_POR_IDIOMA["es"])
     try:
-        respuesta = client.chat.completions.create(
+        respuesta = llamar_modelo_auxiliar(
+            "generacion_examen",
             model=MODELO_AUXILIAR,
             messages=[
                 {"role": "system", "content": plantilla.format(n=n)},
