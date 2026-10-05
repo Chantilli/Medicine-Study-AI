@@ -1,4 +1,5 @@
 import json
+import inspect
 import warnings
 import datetime
 import time
@@ -96,6 +97,38 @@ def seleccionar_modelo_chat(*, tiene_evidencia: bool,
     if tiene_evidencia or categoria_riesgo == "riesgo_personal":
         return MODELO_CHAT
     return MODELO_CHAT_RAPIDO
+
+
+def crear_completions_streaming(cliente, **parametros):
+    """Crea un streaming compatible con SDKs Groq antiguos y nuevos.
+
+    ``stream_options`` habilita el chunk final con usage en SDKs compatibles.
+    Si la firma del cliente no lo acepta, se omite deliberadamente: la
+    respuesta sigue funcionando y usage queda como no disponible. Solo se
+    reintenta ante el TypeError específico de ese argumento; otros errores
+    siguen propagándose.
+    """
+    crear = cliente.chat.completions.create
+    try:
+        firma = inspect.signature(crear)
+        acepta_kwargs = any(
+            parametro.kind == inspect.Parameter.VAR_KEYWORD
+            for parametro in firma.parameters.values()
+        )
+        acepta_stream_options = "stream_options" in firma.parameters or acepta_kwargs
+    except (TypeError, ValueError):
+        acepta_stream_options = False
+
+    llamada = dict(parametros)
+    if acepta_stream_options:
+        llamada["stream_options"] = {"include_usage": True}
+    try:
+        return crear(**llamada)
+    except TypeError as error:
+        if "stream_options" not in llamada or "stream_options" not in str(error):
+            raise
+        llamada.pop("stream_options")
+        return crear(**llamada)
 
 IDIOMAS = {
     "es": {
