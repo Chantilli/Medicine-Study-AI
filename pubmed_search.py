@@ -24,6 +24,7 @@ import numpy as np
 from config import (
     client, obtener_modelo_embeddings, RETMAX_PUBMED, TOP_K_PAPERS,
     UMBRAL_SIMILITUD_PAPER, MAX_CHARS_ABSTRACT_CONTEXTO, MODELO_AUXILIAR,
+    llamar_modelo_auxiliar,
 )
 from database import DB_PATH, obtener_conexion_db
 from rag_embeddings import generar_embedding
@@ -749,7 +750,8 @@ def reescribir_queries_pubmed(pregunta_usuario: str) -> list:
     if not client:
         return [pregunta_usuario]
     try:
-        respuesta = client.chat.completions.create(
+        respuesta = llamar_modelo_auxiliar(
+            "reescritura_consulta_pubmed",
             model=MODELO_AUXILIAR,
             messages=[
                 {"role": "system", "content": (
