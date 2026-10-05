@@ -55,12 +55,13 @@ UMBRAL_SIMILITUD_FRAGMENTOS = 0.25
 
 
 RETMAX_PUBMED = 15              
-TOP_K_PAPERS = 6                
+TOP_K_PAPERS = 5
 UMBRAL_SIMILITUD_PAPER = 0.15   
-MAX_CHARS_ABSTRACT_CONTEXTO = 600
+MAX_CHARS_ABSTRACT_CONTEXTO = 500
 
 
-MODELO_CHAT = "openai/gpt-oss-120b"       
+MODELO_CHAT = "openai/gpt-oss-120b"
+MODELO_CHAT_RAPIDO = os.getenv("GROQ_MODELO_CHAT_RAPIDO", "openai/gpt-oss-20b")
 MODELO_AUXILIAR = "openai/gpt-oss-20b"    
 
 
@@ -74,9 +75,27 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 MAX_PDF_BYTES = 25 * 1024 * 1024
 MAX_PDF_PAGINAS = 100
 
-MAX_PARES_CONVERSACION = 15
+MAX_PARES_CONVERSACION = 8
 MAX_CARACTERES_BLOQUE = 15000
 MAX_CHARS_HISTORIAL = 40000
+REASONING_EFFORT_AUXILIAR = os.getenv("GROQ_REASONING_EFFORT_AUXILIAR", "low")
+MAX_TOKENS_TITULO = 16
+MAX_TOKENS_REVISION = 1800
+
+
+def seleccionar_modelo_chat(*, tiene_evidencia: bool,
+                            categoria_riesgo: str = "educativo") -> str:
+    """Selecciona el modelo por señales reales del turno, sin estado global.
+
+    La evidencia recuperada exige el 120B para razonar sobre citas y fuentes.
+    Las consultas educativas sin evidencia usan el 20B. El riesgo personal
+    conserva el 120B aunque no haya recuperación, porque requiere más cuidado
+    clínico y comunicación de límites. Las emergencias se bloquean antes de
+    llamar al modelo en ``app_ui``.
+    """
+    if tiene_evidencia or categoria_riesgo == "riesgo_personal":
+        return MODELO_CHAT
+    return MODELO_CHAT_RAPIDO
 
 IDIOMAS = {
     "es": {
@@ -149,6 +168,33 @@ IDIOMAS = {
 }
 
 IDIOMA_POR_DEFECTO = "es"
+
+
+def llamar_modelo_auxiliar(operation, messages, *, model=None, max_tokens=800,
+                            temperature=0.0, usuario_id=None, **kwargs):
+    """Llama a Groq con razonamiento bajo y registra usage sin romper clientes
+    o modelos que todavía no aceptan ``reasoning_effort``."""
+    if client is None:
+        return None
+    from auditoria import registrar_uso_respuesta
+
+    parametros = dict(
+        model=model or MODELO_AUXILIAR,
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        reasoning_effort=REASONING_EFFORT_AUXILIAR,
+        **kwargs,
+    )
+    try:
+        respuesta = client.chat.completions.create(**parametros)
+    except Exception as error:
+        if "reasoning_effort" not in str(error).lower():
+            raise
+        parametros.pop("reasoning_effort", None)
+        respuesta = client.chat.completions.create(**parametros)
+    registrar_uso_respuesta(usuario_id, operation, respuesta, modelo=parametros["model"])
+    return respuesta
 
 
 def _reglas_especializadas(consulta: str) -> str:
