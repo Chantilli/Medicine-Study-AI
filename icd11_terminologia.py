@@ -177,13 +177,14 @@ def _extraer_terminos_medicos(pregunta: str) -> list:
     glucólisis"), o cualquier error de formato en la respuesta, devuelve
     una lista vacía — el llamador simplemente no arma glosario ese turno.
     """
-    from config import client, MODELO_AUXILIAR
+    from config import client, MODELO_AUXILIAR, llamar_modelo_auxiliar
     import json as _json
 
     if not client or not pregunta or not pregunta.strip():
         return []
     try:
-        respuesta = client.chat.completions.create(
+        respuesta = llamar_modelo_auxiliar(
+            "icd11_terminologia",
             model=MODELO_AUXILIAR,
             messages=[
                 {"role": "system", "content": (
