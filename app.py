@@ -21,14 +21,11 @@ import os
 import sys
 import time
 import flet as ft
-from PySide6.QtWidgets import QApplication
 
 from config import UPLOAD_DIR
 from database import crear_usuario
 from pubmed_search import buscar_pubmed_estructurado, clasificar_evidencia
 from citas_evidencia import formatear_cita_vancouver, formatear_cita_apa
-from app_ui import main
-from app_ui import MainWindow
 
 
 if __name__ == "__main__" and "--test-pubmed" in sys.argv:
@@ -60,12 +57,13 @@ if __name__ == "__main__" and "--test-pubmed" in sys.argv:
         print("⚠️ La segunda pasada se quedó sin papers relevantes (revisar ranking_semantico/umbral).")
     raise SystemExit(0)
 
-if __name__ == "__main__":
-   
+def run_web():
+    from app_ui import main
+
     if not os.environ.get("FLET_SECRET_KEY"):
         import secrets
         os.environ["FLET_SECRET_KEY"] = secrets.token_hex(32)
-   
+
     puerto = int(os.environ.get("PORT", 7860))
     ft.app(
         target=main,
@@ -74,8 +72,27 @@ if __name__ == "__main__":
         port=puerto,
         upload_dir=str(UPLOAD_DIR),
     )
+
+
+def run_qt():
+    os.environ.setdefault("APP_UI_MODE", "qt")
+    from PySide6.QtWidgets import QApplication
+    from app_ui import MainWindow
+
     app = QApplication(sys.argv)
     app.setApplicationName("Medicine Study AI")
     ventana = MainWindow()
     ventana.show()
     raise SystemExit(app.exec())
+
+
+if __name__ == "__main__":
+    modo = os.environ.get("APP_UI_MODE", "web").strip().lower()
+    if modo == "qt":
+        run_qt()
+    elif modo in {"web", "flet"}:
+        run_web()
+    else:
+        raise SystemExit(
+            f"APP_UI_MODE no válido: {modo!r}. Usa 'web' (Space) o 'qt' (local)."
+        )
