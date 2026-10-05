@@ -70,3 +70,15 @@ def tarjeta_funcion(icono, titulo, descripcion):
         padding=14,
         width=220,
     )
+
+
+def bloque_seccion(controles, *, bgcolor="#15161c", padding=10, expand=False):
+    """Agrupa controles relacionados en un bloque visual reutilizable."""
+    return ft.Container(
+        content=ft.Column(controles, spacing=8),
+        bgcolor=bgcolor,
+        border=ft.border.all(1, "#22232d"),
+        border_radius=10,
+        padding=padding,
+        expand=expand,
+    )
