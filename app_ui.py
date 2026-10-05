@@ -7,11 +7,13 @@ módulos — este archivo solo arma la interfaz y conecta los eventos.
 import os
 import time
 import re
+from types import SimpleNamespace
 import flet as ft
 
 from config import (
     client, SYSTEM_PROMPT, UPLOAD_DIR, MAX_CARACTERES_BLOQUE,
     MODELO_CHAT, MODELO_AUXILIAR, MAX_TOKENS_RESPUESTA, construir_system_prompt,
+    seleccionar_modelo_chat,
     obtener_modelo_embeddings,
     IDIOMAS, IDIOMA_POR_DEFECTO, MAX_PDF_BYTES, MAX_PDF_PAGINAS,
 )
@@ -31,10 +33,9 @@ from citas_evidencia import (
     formatear_contexto_papers, detectar_citas_alucinadas, detectar_citas_fuera_de_rango,
     detectar_negacion_contradictoria, limpiar_negacion_contradictoria,
     verificar_consistencia_fisiologica, construir_lista_fuentes, construir_contexto_para_juez,
-    eliminar_referencias_no_citadas, sincronizar_referencias_con_papers,
+    eliminar_referencias_no_citadas,     sincronizar_referencias_con_papers,
     eliminar_referencias_huerfanas_por_id,
     revisar_respuesta_con_ia,
-    auditar_contradicciones_evidencia,
     evaluar_factualidad, resumen_evidencia_citada,
 )
 
@@ -64,7 +65,10 @@ except ImportError as error:
             flags=re.IGNORECASE,
         )
 from ui_helpers import agregar_papers_a_chat, construir_panel_fuentes, anexar_badge_factualidad
-from historial_utils import recortar_historial, generar_titulo_con_ia
+from historial_utils import (
+    recortar_historial, generar_titulo_con_ia, construir_mensajes_con_contexto_actual,
+    preparar_historial_para_guardar, migrar_historial_guardado,
+)
 from flashcards import (
     generar_flashcards_con_ia, obtener_flashcards_pendientes,
     contar_flashcards_pendientes, registrar_repaso,
@@ -84,7 +88,7 @@ from seguridad_prompt_injection import sanitizar_texto_pdf, resumir_alertas
 from limite_uso import verificar_limite, registrar_solicitud
 from icd11_terminologia import construir_glosario_icd11
 from feedback import registrar_feedback
-from auditoria import registrar_evento
+from auditoria import registrar_evento, registrar_uso_respuesta
 from clasificador_riesgo_clinico import (
     clasificar_consulta, mensaje_emergencia_medica, mensaje_emergencia_salud_mental,
     aviso_riesgo_personal, instruccion_refuerzo_riesgo_personal,
@@ -656,7 +660,7 @@ def main(page: ft.Page):
         chat_actual_id[0] = chat_id
         mensajes_guardados = obtener_mensajes_chat(chat_id, usuario_actual_id[0])
         if mensajes_guardados:
-            historial = mensajes_guardados
+            historial = migrar_historial_guardado(mensajes_guardados, idioma_var[0])
             _renderizar_historial_en_chat()
             fragmentos_sesion.clear()
             txt_estado_pdf.value = ""
@@ -927,20 +931,34 @@ def main(page: ft.Page):
                             _completar_paso_proceso(fila_icd11, t("icd11_sin_terminos", idioma_var[0]), error=True)
 
                 bloque_total_contexto = f"{bloque_pdf}\n{contexto_pubmed}\n{bloque_icd11}"
-
-                historial.append({"role": "user", "content": f"{bloque_total_contexto}\nPregunta: {texto}{sufijo_riesgo_personal}"})
-                historial = recortar_historial(historial)
-                mensajes_para_groq = [{"role": m["role"], "content": m["content"]} for m in historial]
+                tiene_evidencia_recuperada = any((
+                    bool(papers_relevantes),
+                    bool(fragmentos_relevantes),
+                    bool(contexto_pubmed.strip()),
+                    bool(bloque_pdf.strip()),
+                    bool(bloque_icd11.strip()),
+                ))
+                modelo_chat_turno = seleccionar_modelo_chat(
+                    tiene_evidencia=tiene_evidencia_recuperada,
+                    categoria_riesgo=clasificacion["categoria"],
+                )
+                pregunta_modelo = f"{texto}{sufijo_riesgo_personal}"
+                mensajes_para_groq = construir_mensajes_con_contexto_actual(
+                    historial,
+                    pregunta_modelo,
+                    bloque_total_contexto,
+                )
                 mensajes_para_groq[0] = construir_system_prompt(idioma_var[0], texto)
 
                 fila_generando = _agregar_paso_proceso(columna_pasos, t("generando_respuesta", idioma_var[0]))
 
                 response_stream = client.chat.completions.create(
-                    model=MODELO_CHAT,
+                    model=modelo_chat_turno,
                     messages=mensajes_para_groq,
                     temperature=0.0,
                     max_tokens=MAX_TOKENS_RESPUESTA,
-                    stream=True
+                    stream=True,
+                    stream_options={"include_usage": True},
                 )
                 indicador_respuesta = indicador_streaming(
                     t("generando_respuesta", idioma_var[0])
@@ -951,9 +969,14 @@ def main(page: ft.Page):
                 chat_view.controls.append(fila_respuesta)
                 page.update()
                 full_response = ""
+                usage_respuesta = None
                 _contador_chunks = 0
                 for chunk in response_stream:
-                    delta = getattr(chunk.choices[0].delta, "content", None)
+                    usage_respuesta = getattr(chunk, "usage", None) or usage_respuesta
+                    choices = getattr(chunk, "choices", None) or []
+                    if not choices:
+                        continue
+                    delta = getattr(choices[0].delta, "content", None)
                     if delta:
                         full_response += delta
                         ai_markdown.value = full_response
@@ -964,6 +987,11 @@ def main(page: ft.Page):
                 if indicador_respuesta in chat_view.controls:
                     chat_view.controls.remove(indicador_respuesta)
                 _completar_paso_proceso(fila_generando, t("respuesta_generada", idioma_var[0]))
+                if usage_respuesta is not None:
+                    registrar_uso_respuesta(
+                        usuario_actual_id[0], "chat", SimpleNamespace(usage=usage_respuesta),
+                        modelo=modelo_chat_turno,
+                    )
                 page.update()
 
                 if detectar_citas_alucinadas(full_response, len(papers_relevantes), len(fragmentos_relevantes)):
@@ -975,11 +1003,6 @@ def main(page: ft.Page):
                     contexto_pubmed, bloque_pdf
                 )
                 full_response = revisar_respuesta_con_ia(
-                    full_response,
-                    contexto_revision,
-                    idioma_var[0],
-                )
-                full_response = auditar_contradicciones_evidencia(
                     full_response,
                     contexto_revision,
                     idioma_var[0],
@@ -1068,6 +1091,7 @@ def main(page: ft.Page):
                     fact = evaluar_factualidad(full_response, contexto_juez)
                     _completar_paso_proceso(fila_fact, t("afirmaciones_verificadas", idioma_var[0]))
 
+                historial.append({"role": "user", "content": texto})
                 msg_asistente = {"role": "assistant", "content": full_response}
                 if fuentes:
                     msg_asistente["_fuentes"] = fuentes
@@ -1105,10 +1129,14 @@ def main(page: ft.Page):
                         if c_id == chat_actual_id[0]:
                             titulo_chat = titulo_existente
                             break
-                guardar_chat_db(chat_actual_id[0], titulo_chat, historial, usuario_actual_id[0])
+                guardar_chat_db(
+                    chat_actual_id[0], titulo_chat,
+                    preparar_historial_para_guardar(historial),
+                    usuario_actual_id[0],
+                )
                 actualizar_sidebar_historial()
                 registrar_evento(
-                    usuario_actual_id[0], "chat", modelo=MODELO_CHAT, estado="ok",
+                    usuario_actual_id[0], "chat", modelo=modelo_chat_turno, estado="ok",
                     latencia_ms=int((time.time() - tiempo_inicio_turno) * 1000),
                     n_fuentes=len(fuentes) if fuentes else 0, texto_consulta=texto,
                 )
@@ -1116,7 +1144,7 @@ def main(page: ft.Page):
             except Exception as ex:
                 chat_view.controls.append(tarjeta_aviso(t("error_generico", idioma_var[0], error=ex), tipo="error"))
                 registrar_evento(
-                    usuario_actual_id[0], "chat", modelo=MODELO_CHAT, estado="error",
+                    usuario_actual_id[0], "chat", modelo=modelo_chat_turno, estado="error",
                     latencia_ms=int((time.time() - tiempo_inicio_turno) * 1000), texto_consulta=texto,
                 )
                 page.update()
