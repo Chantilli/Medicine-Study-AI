@@ -31,6 +31,7 @@ def test_calculator_delegates_to_existing_module(client):
 
 def test_sse_blocks_emergency_before_groq(client, monkeypatch):
     called = {"value": False}
+    monkeypatch.setattr(api, "verificar_limite", lambda *args, **kwargs: {"permitido": True})
 
     def fail_if_called(*args, **kwargs):
         called["value"] = True
@@ -125,6 +126,26 @@ def test_feedback_and_audit_routes(client, monkeypatch):
     assert feedback.json()["saved"] is True
     assert client.get("/api/auditoria?usuario_id=1").status_code == 200
     assert client.get("/api/feedback/summary").status_code == 200
+
+
+def test_feedback_route_persists_real_vote(client):
+    chat_id = f"feedback-{uuid.uuid4().hex}"
+    response = client.post(
+        "/api/feedback",
+        json={
+            "usuario_id": 1,
+            "chat_id": chat_id,
+            "pregunta": "¿Qué es el IMC?",
+            "respuesta": "Es una relación entre peso y talla.",
+            "valoracion": -1,
+            "fuentes": [{"titulo": "Fuente educativa"}],
+            "idioma": "es",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["saved"] is True
+    rows = api.resumen_feedback(365)
+    assert rows["negativos"] >= 1
 
 
 def test_icd_route_enforces_user_limit_and_delegates(client, monkeypatch):
