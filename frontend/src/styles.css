@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+article p { margin: 0.55rem 0; }
+article table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+article th, article td { border: 1px solid #475569; padding: 0.5rem; }
+article code { border-radius: 0.25rem; background: #0f172a; padding: 0.1rem 0.25rem; }

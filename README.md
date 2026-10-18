@@ -82,8 +82,8 @@ Arquitectura
                               │   + Auditoría (hash, no texto) + Feedback (👍/👎) │
                               └────────────────────────────────────────────────────┘
 
-La UI (Flet) se apoya en tres módulos separados de la lógica de negocio — ui_shell.py (layout responsive), ui_componentes.py (piezas visuales reutilizables) y ui_helpers.py (tarjetas de papers, panel de fuentes, badge de factualidad) — para que app_ui.py no concentre toda la interfaz.
-La UI de escritorio PySide6 se apoya en tres módulos separados de la lógica de negocio — ui_shell.py (layout y compatibilidad), ui_componentes.py (widgets reutilizables) y ui_helpers.py (tarjetas de papers, panel de fuentes, badge de factualidad) — para que app_ui.py solo coordine eventos.
+La interfaz web actual se apoya en React + Vite + Tailwind y consume `api.py`.
+Los módulos Flet y PySide6 se conservan para compatibilidad local y no se eliminan.
 
 
 
@@ -116,7 +116,9 @@ UI responsive (sidebar colapsable en móvil), API keys opcionales para NCBI/Sema
 
 Stack tecnológico
 
-UI: Flet (Python → Flutter), con layout responsive para móvil
+UI web: React + Vite + Tailwind, `react-markdown`/GFM, KaTeX y una vista de progreso preparada para Recharts
+API: FastAPI, incluyendo streaming SSE de Groq al navegador
+UI legacy: Flet (Python → Flutter), conservada para compatibilidad local
 UI: PySide6 (Qt para Python), con login, chat, adjuntos PDF y calculadoras clínicas
 LLM: Groq (openai/gpt-oss-120b para chat/juez, openai/gpt-oss-20b para tareas auxiliares)
 Embeddings: sentence-transformers (paraphrase-multilingual-MiniLM-L12-v2) para RAG y ranking semántico de papers
@@ -142,9 +144,21 @@ python -m venv .venv
 # macOS/Linux:
 # source .venv/bin/activate
 pip install -r requirements.txt
-python app.py
+uvicorn api:app --reload --port 7860
 
-La interfaz abre como aplicación de escritorio. Para ejecutar únicamente la
+En otra terminal, para trabajar en la interfaz:
+
+cd frontend
+npm install
+npm run dev
+
+El frontend de producción se compila automáticamente dentro del Dockerfile
+multi-etapa. La imagen final contiene FastAPI y los estáticos compilados en un
+único contenedor y escucha en el puerto `7860`, compatible con el Space de
+Hugging Face.
+
+Para abrir la interfaz legacy de escritorio usa `APP_UI_MODE=qt python app.py`.
+Para ejecutar únicamente la
 comprobación de búsqueda de PubMed sin abrir Qt:
 
 python app.py --test-pubmed "metformina diabetes tipo 2"
@@ -189,9 +203,11 @@ configuración propios.
 
 Estructura de módulos
 
-app.py                          Punto de entrada
-app_ui.py                       Vistas y chat principal de Flet
-app_ui.py                       Ventana PySide6: login, chat, PDF y calculadoras
+app.py                          Punto de entrada legacy y self-test
+api.py                          API FastAPI, autenticación, calculadoras y SSE
+frontend/                       Aplicación React/Vite/Tailwind
+app_ui.py                       Vistas y chat principal de Flet (compatibilidad)
+app_ui.py                       También contiene la ventana PySide6 local
 ui_shell.py                      Layout responsive (sidebar móvil/escritorio)
 ui_componentes.py                Componentes visuales reutilizables (avisos, chips, tarjetas)
 ui_helpers.py                    Tarjetas de papers, panel de fuentes, badge de factualidad
