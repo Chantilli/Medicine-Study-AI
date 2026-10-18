@@ -12,7 +12,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Iterator
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -42,14 +42,35 @@ from config import (
 from historial_utils import construir_mensajes_con_contexto_actual
 from database import (
     crear_usuario,
+    eliminar_chat_db,
+    guardar_chat_db,
     inicializar_db,
+    obtener_mensajes_chat,
+    obtener_todos_los_chats,
     obtener_usuario_por_nombre,
     verificar_password,
 )
+from examenes import (
+    generar_examen_con_ia,
+    obtener_preguntas_examen,
+    registrar_intento,
+)
+from flashcards import (
+    contar_flashcards_pendientes,
+    generar_flashcards_con_ia,
+    obtener_flashcards_pendientes,
+    registrar_repaso,
+)
+from interacciones_farmacologicas import verificar_interacciones
+from memoria_estudiante import evaluar_nivel_por_tema, resumen_progreso
+from ocr_pdf import extraer_texto_pdf_con_ocr
 from pubmed_search import (
     buscar_pubmed_estructurado,
     filtrar_papers_por_evidencia,
 )
+from rag_embeddings import guardar_fragmentos_pdf
+from seguridad_prompt_injection import sanitizar_texto_pdf
+from config import MAX_PDF_BYTES, MAX_PDF_PAGINAS, UPLOAD_DIR
 
 try:
     from config import client
@@ -95,6 +116,37 @@ class CalculatorRequest(BaseModel):
     parametros: dict[str, Any] = Field(default_factory=dict)
 
 
+class UserRequest(BaseModel):
+    usuario_id: int
+
+
+class GenerateRequest(UserRequest):
+    texto_fuente: str = Field(min_length=1, max_length=12000)
+    tema: str | None = None
+    fuente: str | None = None
+    n: int = Field(default=5, ge=1, le=20)
+    idioma: str = Field(default="es", pattern="^(es|en|fr|de|zh)$")
+
+
+class ReviewRequest(UserRequest):
+    flashcard_id: int
+    boton: str
+
+
+class ExamAttemptRequest(UserRequest):
+    pregunta_id: int
+    correcta: bool
+
+
+class ChatSaveRequest(UserRequest):
+    titulo: str = Field(default="Nuevo chat", max_length=120)
+    mensajes: list[dict[str, str]] = Field(default_factory=list)
+
+
+class InteractionRequest(BaseModel):
+    farmacos: list[str] = Field(min_length=1, max_length=20)
+
+
 @app.on_event("startup")
 def startup() -> None:
     inicializar_db()
@@ -135,6 +187,34 @@ def login(payload: AuthRequest) -> dict[str, Any]:
     if not fila or not verificar_password(payload.password, fila[1]):
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
     return {"usuario_id": int(fila[0]), "usuario": payload.usuario.strip()}
+
+
+@app.get("/api/chats")
+def list_chats(usuario_id: int) -> list[dict[str, Any]]:
+    return [
+        {"id": chat[0], "titulo": chat[1]}
+        for chat in obtener_todos_los_chats(usuario_id)
+    ]
+
+
+@app.get("/api/chats/{chat_id}")
+def get_chat(chat_id: str, usuario_id: int) -> dict[str, Any]:
+    mensajes = obtener_mensajes_chat(chat_id, usuario_id)
+    if mensajes is None:
+        raise HTTPException(status_code=404, detail="Chat no encontrado")
+    return {"id": chat_id, "mensajes": mensajes}
+
+
+@app.post("/api/chats/{chat_id}")
+def save_chat(chat_id: str, payload: ChatSaveRequest) -> dict[str, Any]:
+    guardar_chat_db(chat_id, payload.titulo[:120], payload.mensajes, payload.usuario_id)
+    return {"id": chat_id, "saved": True}
+
+
+@app.delete("/api/chats/{chat_id}")
+def delete_chat(chat_id: str, usuario_id: int) -> dict[str, bool]:
+    eliminar_chat_db(chat_id, usuario_id)
+    return {"deleted": True}
 
 
 def _prepare_chat(payload: ChatRequest) -> tuple[dict[str, Any], Iterator[str]]:
@@ -279,10 +359,100 @@ def calculator(payload: CalculatorRequest) -> dict[str, Any]:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+@app.post("/api/flashcards/generate")
+def generate_flashcards(payload: GenerateRequest) -> dict[str, Any]:
+    cards, diagnostic = generar_flashcards_con_ia(
+        payload.usuario_id, payload.texto_fuente, payload.tema, payload.fuente,
+        payload.n, payload.idioma,
+    )
+    return {"flashcards": cards, "diagnostico": diagnostic}
+
+
+@app.get("/api/flashcards")
+def list_flashcards(usuario_id: int, pendientes: bool = False) -> dict[str, Any]:
+    cards = (
+        obtener_flashcards_pendientes(usuario_id)
+        if pendientes else []
+    )
+    return {
+        "flashcards": cards,
+        "pendientes": contar_flashcards_pendientes(usuario_id),
+    }
+
+
+@app.post("/api/flashcards/review")
+def review_flashcard(payload: ReviewRequest) -> dict[str, Any]:
+    result = registrar_repaso(payload.usuario_id, payload.flashcard_id, payload.boton)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Flashcard o botón no válido")
+    return result
+
+
+@app.post("/api/examenes/generate")
+def generate_exam(payload: GenerateRequest) -> dict[str, Any]:
+    questions, diagnostic = generar_examen_con_ia(
+        payload.usuario_id, payload.texto_fuente, payload.tema, payload.fuente,
+        payload.n, payload.idioma,
+    )
+    return {"preguntas": questions, "diagnostico": diagnostic}
+
+
+@app.get("/api/examenes")
+def list_exams(usuario_id: int, tema: str | None = None) -> dict[str, Any]:
+    return {"preguntas": obtener_preguntas_examen(usuario_id, tema)}
+
+
+@app.post("/api/examenes/attempt")
+def attempt_exam(payload: ExamAttemptRequest) -> dict[str, bool]:
+    registrar_intento(payload.usuario_id, payload.pregunta_id, payload.correcta)
+    return {"saved": True}
+
+
+@app.post("/api/interacciones")
+def interactions(payload: InteractionRequest) -> dict[str, Any]:
+    return verificar_interacciones(payload.farmacos)
+
+
+@app.post("/api/uploads/pdf")
+async def upload_pdf(
+    usuario_id: int = Form(...),
+    archivo: UploadFile = File(...),
+) -> dict[str, Any]:
+    nombre = Path(archivo.filename or "documento.pdf").name
+    if not nombre.lower().endswith(".pdf"):
+        raise HTTPException(status_code=415, detail="Solo se aceptan archivos PDF")
+    contenido = await archivo.read(MAX_PDF_BYTES + 1)
+    if len(contenido) > MAX_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="El PDF supera el límite permitido")
+    ruta = UPLOAD_DIR / f"{usuario_id}_{uuid.uuid4().hex}_{nombre}"
+    ruta.write_bytes(contenido)
+    try:
+        extraido = extraer_texto_pdf_con_ocr(ruta, max_paginas=MAX_PDF_PAGINAS)
+        texto, alertas = sanitizar_texto_pdf(extraido["texto"])
+        fragmentos = guardar_fragmentos_pdf(
+            usuario_id, nombre, texto, tipo_texto="ocr" if extraido["via_ocr"] else "normal"
+        )
+        return {
+            "nombre": nombre,
+            "fragmentos": fragmentos,
+            "via_ocr": extraido["via_ocr"],
+            "alertas_seguridad": alertas,
+            "caracteres": len(texto),
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    finally:
+        ruta.unlink(missing_ok=True)
+
+
 @app.get("/api/progreso")
 def progress(usuario_id: int | None = None) -> dict[str, Any]:
-    # El frontend puede sustituir este resumen por métricas reales sin cambiar el contrato.
-    return {"usuario_id": usuario_id or _anonymous_user_id(), "series": [], "message": "Sin datos aún"}
+    resolved_id = usuario_id or _anonymous_user_id()
+    return {
+        "usuario_id": resolved_id,
+        "resumen": resumen_progreso(resolved_id),
+        "temas": evaluar_nivel_por_tema(resolved_id),
+    }
 
 
 if STATIC_DIR.exists():
