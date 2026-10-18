@@ -128,6 +128,8 @@ def test_feedback_and_audit_routes(client, monkeypatch):
 
 
 def test_icd_route_enforces_user_limit_and_delegates(client, monkeypatch):
+    monkeypatch.setattr(api, "verificar_limite", lambda *args, **kwargs: {"permitido": True})
+    monkeypatch.setattr(api, "registrar_solicitud", lambda *args, **kwargs: None)
     monkeypatch.setattr(api, "construir_glosario_icd11", lambda *args: {"estado": "ok", "terminos_encontrados": []})
     response = client.post(
         "/api/icd11",
@@ -138,6 +140,8 @@ def test_icd_route_enforces_user_limit_and_delegates(client, monkeypatch):
 
 
 def test_pubmed_route_delegates_and_filters(client, monkeypatch):
+    monkeypatch.setattr(api, "verificar_limite", lambda *args, **kwargs: {"permitido": True})
+    monkeypatch.setattr(api, "registrar_solicitud", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         api,
         "buscar_pubmed_estructurado",
