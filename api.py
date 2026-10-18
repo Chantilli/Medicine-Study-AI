@@ -53,7 +53,11 @@ from config import (
     crear_completions_streaming,
     seleccionar_modelo_chat,
 )
-from historial_utils import construir_mensajes_con_contexto_actual
+from historial_utils import (
+    construir_mensajes_con_contexto_actual,
+    generar_titulo_con_ia,
+    preparar_historial_para_guardar,
+)
 from database import (
     crear_usuario,
     eliminar_chat_db,
@@ -132,6 +136,8 @@ class ChatRequest(BaseModel):
     buscar_pubmed: bool | None = None
     verificar_factualidad: bool = True
     modo_evidencia: str = "todo"
+    chat_id: str | None = None
+    titulo: str | None = None
     historial: list[dict[str, str]] = Field(default_factory=list)
 
 
@@ -262,7 +268,7 @@ def list_chats(usuario_id: int) -> list[dict[str, Any]]:
 @app.get("/api/chats/{chat_id}")
 def get_chat(chat_id: str, usuario_id: int) -> dict[str, Any]:
     mensajes = obtener_mensajes_chat(chat_id, usuario_id)
-    if mensajes is None:
+    if not any(chat[0] == chat_id for chat in obtener_todos_los_chats(usuario_id)):
         raise HTTPException(status_code=404, detail="Chat no encontrado")
     return {"id": chat_id, "mensajes": mensajes}
 
@@ -437,6 +443,20 @@ def _prepare_chat(payload: ChatRequest) -> tuple[dict[str, Any], Iterator[str]]:
                 n_fuentes=len(papers) + len(fragmentos),
                 texto_consulta=payload.mensaje,
             )
+            chat_id = payload.chat_id
+            if chat_id:
+                try:
+                    titulo = payload.titulo or generar_titulo_con_ia(
+                        payload.mensaje, idioma=payload.idioma
+                    )
+                except Exception:
+                    titulo = payload.titulo or payload.mensaje[:80]
+                historial_guardado = preparar_historial_para_guardar(
+                    [*historial, {"role": "user", "content": payload.mensaje},
+                     {"role": "assistant", "content": respuesta_final}]
+                )
+                guardar_chat_db(chat_id, titulo, historial_guardado, usuario_id)
+                yield _sse("persistence", {"chat_id": chat_id, "titulo": titulo})
             yield _sse("done", {"content": respuesta_final, "modelo": modelo})
         except Exception as exc:
             registrar_evento(

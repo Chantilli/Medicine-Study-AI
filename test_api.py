@@ -1,4 +1,5 @@
 import uuid
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -62,6 +63,8 @@ def test_auth_and_chat_persistence(client):
 
 
 def test_material_and_interactions_routes(client, monkeypatch):
+    monkeypatch.setattr(api, "verificar_limite", lambda *args, **kwargs: {"permitido": True})
+    monkeypatch.setattr(api, "registrar_solicitud", lambda *args, **kwargs: None)
     monkeypatch.setattr(api, "generar_flashcards_con_ia", lambda *args: ([{"id": 1}], None))
     monkeypatch.setattr(api, "generar_examen_con_ia", lambda *args: ([{"id": 1}], None))
     cards = client.post(
@@ -146,3 +149,46 @@ def test_pubmed_route_delegates_and_filters(client, monkeypatch):
     )
     assert response.status_code == 200
     assert response.json()["papers"][0]["titulo"] == "Paper"
+
+
+def test_chat_stream_uses_groq_and_persists_legacy_history(client, monkeypatch):
+    username = f"stream_{uuid.uuid4().hex[:10]}"
+    user_id = client.post(
+        "/api/auth/register", json={"usuario": username, "password": "test1234"}
+    ).json()["usuario_id"]
+    monkeypatch.setattr(api, "client", object())
+    monkeypatch.setattr(api, "buscar_pubmed_estructurado", lambda *args: ([], 0, 0, [], {"estado": "ok"}))
+    monkeypatch.setattr(api, "buscar_fragmentos_relevantes", lambda *args: [])
+    monkeypatch.setattr(api, "construir_glosario_icd11", lambda *args: {"terminos_encontrados": [], "bloque_contexto": ""})
+    monkeypatch.setattr(api, "generar_titulo_con_ia", lambda *args, **kwargs: "Consulta de estudio")
+    monkeypatch.setattr(
+        api,
+        "crear_completions_streaming",
+        lambda *args, **kwargs: iter([
+            SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="Respuesta "))]),
+            SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="real"))]),
+        ]),
+    )
+    response = client.post(
+        "/api/chat/stream",
+        json={
+            "usuario_id": user_id,
+            "chat_id": "persisted-stream-chat",
+            "mensaje": "Explica el ciclo cardiaco",
+            "buscar_pubmed": False,
+        },
+    )
+    assert response.status_code == 200
+    assert "event: token" in response.text
+    assert '"content": "Respuesta real"' in response.text
+    assert "event: persistence" in response.text
+    saved = client.get(
+        "/api/chats/persisted-stream-chat", params={"usuario_id": user_id}
+    )
+    assert saved.status_code == 200
+    assert saved.json()["mensajes"][-1]["content"] == "Respuesta real"
+
+
+def test_missing_chat_is_not_reported_as_empty_success(client):
+    response = client.get("/api/chats/does-not-exist", params={"usuario_id": 1})
+    assert response.status_code == 404
