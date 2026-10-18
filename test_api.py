@@ -85,3 +85,64 @@ def test_upload_rejects_non_pdf(client):
         files={"archivo": ("notes.txt", b"not a pdf", "text/plain")},
     )
     assert response.status_code == 415
+
+
+def test_options_exposes_legacy_controls(client):
+    result = client.get("/api/options")
+    assert result.status_code == 200
+    body = result.json()
+    assert {item["codigo"] for item in body["idiomas"]} == {"es", "en", "fr", "de", "zh"}
+    assert "todo" in body["modos_evidencia"]
+    assert "chat" in body["limites"]
+
+
+def test_interaction_ai_route_delegates(client, monkeypatch):
+    monkeypatch.setattr(api, "analizar_interaccion_con_ia", lambda *args, **kwargs: {"disponible": True, "texto": "ok"})
+    response = client.post(
+        "/api/interacciones/ia",
+        json={"farmaco_a": "warfarina", "farmaco_b": "ibuprofeno", "idioma": "es"},
+    )
+    assert response.status_code == 200
+    assert response.json()["disponible"] is True
+
+
+def test_feedback_and_audit_routes(client, monkeypatch):
+    monkeypatch.setattr(api, "registrar_feedback", lambda *args, **kwargs: True)
+    feedback = client.post(
+        "/api/feedback",
+        json={
+            "usuario_id": 1,
+            "chat_id": "chat",
+            "pregunta": "IMC",
+            "respuesta": "Respuesta educativa",
+            "valoracion": 1,
+        },
+    )
+    assert feedback.status_code == 200
+    assert feedback.json()["saved"] is True
+    assert client.get("/api/auditoria?usuario_id=1").status_code == 200
+    assert client.get("/api/feedback/summary").status_code == 200
+
+
+def test_icd_route_enforces_user_limit_and_delegates(client, monkeypatch):
+    monkeypatch.setattr(api, "construir_glosario_icd11", lambda *args: {"estado": "ok", "terminos_encontrados": []})
+    response = client.post(
+        "/api/icd11",
+        json={"usuario_id": 1, "pregunta": "diabetes mellitus", "idioma": "es"},
+    )
+    assert response.status_code == 200
+    assert response.json()["estado"] == "ok"
+
+
+def test_pubmed_route_delegates_and_filters(client, monkeypatch):
+    monkeypatch.setattr(
+        api,
+        "buscar_pubmed_estructurado",
+        lambda *args: ([{"titulo": "Paper", "tipos_publicacion": ["Randomized Controlled Trial"]}], 1, 1, [], {"estado": "ok"}),
+    )
+    response = client.post(
+        "/api/search/pubmed",
+        json={"usuario_id": 1, "consulta": "diabetes"},
+    )
+    assert response.status_code == 200
+    assert response.json()["papers"][0]["titulo"] == "Paper"

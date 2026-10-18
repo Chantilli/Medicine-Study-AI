@@ -26,6 +26,20 @@ from calculadoras_clinicas import (
     calcular_superficie_corporal,
     obtener_ajuste_renal,
 )
+from auditoria import obtener_resumen_auditoria, registrar_evento
+from citas_evidencia import (
+    construir_contexto_para_juez,
+    construir_lista_fuentes,
+    detectar_citas_alucinadas,
+    detectar_citas_fuera_de_rango,
+    evaluar_factualidad,
+    formatear_contexto_papers,
+    normalizar_citas_pmid,
+    resumen_evidencia_citada,
+    revisar_respuesta_con_ia,
+    sincronizar_referencias_con_papers,
+    verificar_consistencia_fisiologica,
+)
 from clasificador_riesgo_clinico import (
     aviso_riesgo_personal,
     clasificar_consulta,
@@ -62,15 +76,23 @@ from flashcards import (
     registrar_repaso,
 )
 from interacciones_farmacologicas import verificar_interacciones
+from interacciones_farmacologicas import analizar_interaccion_con_ia
+from icd11_terminologia import construir_glosario_icd11
+from extraccion_tablas import extraer_tablas_pdf
+from feedback import registrar_feedback, resumen_feedback
+from limite_uso import LIMITES, registrar_solicitud, verificar_limite
 from memoria_estudiante import evaluar_nivel_por_tema, resumen_progreso
 from ocr_pdf import extraer_texto_pdf_con_ocr
 from pubmed_search import (
     buscar_pubmed_estructurado,
+    buscar_europepmc,
+    buscar_semantic_scholar,
     filtrar_papers_por_evidencia,
 )
 from rag_embeddings import guardar_fragmentos_pdf
 from seguridad_prompt_injection import sanitizar_texto_pdf
-from config import MAX_PDF_BYTES, MAX_PDF_PAGINAS, UPLOAD_DIR
+from seguridad_prompt_injection import resumir_alertas
+from config import IDIOMAS, MAX_PDF_BYTES, MAX_PDF_PAGINAS, UPLOAD_DIR
 
 try:
     from config import client
@@ -107,7 +129,9 @@ class ChatRequest(BaseModel):
     usuario_id: int | None = None
     idioma: str = Field(default="es", pattern="^(es|en|fr|de|zh)$")
     buscar_evidencia: bool = True
-    modo_evidencia: str = "todos"
+    buscar_pubmed: bool | None = None
+    verificar_factualidad: bool = True
+    modo_evidencia: str = "todo"
     historial: list[dict[str, str]] = Field(default_factory=list)
 
 
@@ -145,6 +169,44 @@ class ChatSaveRequest(UserRequest):
 
 class InteractionRequest(BaseModel):
     farmacos: list[str] = Field(min_length=1, max_length=20)
+    idioma: str = Field(default="es", pattern="^(es|en|fr|de|zh)$")
+
+
+class InteractionAiRequest(BaseModel):
+    farmaco_a: str = Field(min_length=1, max_length=120)
+    farmaco_b: str = Field(min_length=1, max_length=120)
+    idioma: str = Field(default="es", pattern="^(es|en|fr|de|zh)$")
+
+
+class FeedbackRequest(BaseModel):
+    usuario_id: int
+    chat_id: str | None = None
+    pregunta: str = Field(min_length=1, max_length=12000)
+    respuesta: str = Field(min_length=1, max_length=50000)
+    valoracion: int = Field(ge=-1, le=1)
+    fuentes: list[dict[str, Any]] | None = None
+    idioma: str = Field(default="es", pattern="^(es|en|fr|de|zh)$")
+
+
+class SearchRequest(BaseModel):
+    consulta: str = Field(min_length=2, max_length=500)
+    usuario_id: int
+    idioma: str = Field(default="es", pattern="^(es|en|fr|de|zh)$")
+    modo_evidencia: str = "todo"
+    limite: int = Field(default=10, ge=1, le=30)
+    rango_anios: tuple[int, int] | None = None
+
+
+class IcdRequest(BaseModel):
+    pregunta: str = Field(min_length=2, max_length=12000)
+    usuario_id: int
+    idioma: str = Field(default="es", pattern="^(es|en|fr|de|zh)$")
+
+
+class UsageRequest(BaseModel):
+    usuario_id: int
+    tipo: str
+    idioma: str = Field(default="es", pattern="^(es|en|fr|de|zh)$")
 
 
 @app.on_event("startup")
@@ -219,6 +281,11 @@ def delete_chat(chat_id: str, usuario_id: int) -> dict[str, bool]:
 
 def _prepare_chat(payload: ChatRequest) -> tuple[dict[str, Any], Iterator[str]]:
     usuario_id = payload.usuario_id or _anonymous_user_id()
+    usar_pubmed = payload.buscar_evidencia if payload.buscar_pubmed is None else payload.buscar_pubmed
+    limite_chat = verificar_limite(usuario_id, "chat", payload.idioma)
+    if not limite_chat["permitido"]:
+        return {"limit": limite_chat}, iter(())
+    registrar_solicitud(usuario_id, "chat")
     clasificacion = clasificar_consulta(payload.mensaje)
     if clasificacion["categoria"] == "emergencia":
         subtipo = clasificacion.get("subtipo")
@@ -227,28 +294,37 @@ def _prepare_chat(payload: ChatRequest) -> tuple[dict[str, Any], Iterator[str]]:
             if subtipo == "salud_mental"
             else mensaje_emergencia_medica(payload.idioma)
         )
+        registrar_evento(
+            usuario_id, f"chat_emergencia_{clasificacion.get('subtipo') or 'medica'}",
+            estado="bloqueado", texto_consulta=payload.mensaje,
+        )
         return {"clasificacion": clasificacion, "emergencia": texto}, iter(())
 
     def stream() -> Iterator[str]:
         yield _sse("meta", {"clasificacion": clasificacion})
+        if clasificacion["categoria"] == "riesgo_personal":
+            yield _sse("risk", {"message": aviso_riesgo_personal(payload.idioma)})
         contexto_pubmed = ""
         papers = []
-        if payload.buscar_evidencia:
-            try:
-                papers, _, total, debug, estado = buscar_pubmed_estructurado(
-                    payload.mensaje, usuario_id
-                )
-                papers = filtrar_papers_por_evidencia(papers, payload.modo_evidencia)
-                contexto_pubmed = "\n\n".join(
-                    f"[{index}] {paper.get('titulo', '')}\n{paper.get('resumen', '')}"
-                    for index, paper in enumerate(papers, start=1)
-                )
-                yield _sse(
-                    "evidence",
-                    {"papers": papers, "total": total, "debug": debug, "estado": estado},
-                )
-            except Exception as exc:
-                yield _sse("warning", {"message": f"No se pudo consultar evidencia: {exc}"})
+        fragmentos = []
+        if usar_pubmed:
+            limite_pubmed = verificar_limite(usuario_id, "pubmed", payload.idioma)
+            if not limite_pubmed["permitido"]:
+                yield _sse("warning", {"message": limite_pubmed["motivo"], "tipo": "pubmed"})
+            else:
+                registrar_solicitud(usuario_id, "pubmed")
+                try:
+                    papers, _, total, debug, estado = buscar_pubmed_estructurado(
+                        payload.mensaje, usuario_id
+                    )
+                    papers = filtrar_papers_por_evidencia(papers, payload.modo_evidencia)
+                    contexto_pubmed = formatear_contexto_papers(papers, payload.idioma)
+                    yield _sse(
+                        "evidence",
+                        {"papers": papers, "total": total, "debug": debug, "estado": estado},
+                    )
+                except Exception as exc:
+                    yield _sse("warning", {"message": f"No se pudo consultar evidencia: {exc}", "tipo": "pubmed"})
 
         bloque_pdf = ""
         if client is not None and buscar_fragmentos_relevantes is not None:
@@ -258,6 +334,8 @@ def _prepare_chat(payload: ChatRequest) -> tuple[dict[str, Any], Iterator[str]]:
                     f"[F{i}] {fuente}\n{texto}"
                     for i, (_, fuente, texto, _) in enumerate(fragmentos, start=1)
                 )
+                if fragmentos:
+                    yield _sse("retrieval", {"fragmentos": len(fragmentos)})
             except Exception as exc:
                 yield _sse("warning", {"message": f"No se pudo consultar el PDF: {exc}"})
 
@@ -265,12 +343,24 @@ def _prepare_chat(payload: ChatRequest) -> tuple[dict[str, Any], Iterator[str]]:
             yield _sse("error", {"message": "GROQ_API_KEY no está configurada."})
             return
 
+        bloque_icd11 = ""
+        if payload.idioma != "en":
+            limite_icd = verificar_limite(usuario_id, "icd11", payload.idioma)
+            if limite_icd["permitido"]:
+                registrar_solicitud(usuario_id, "icd11")
+                try:
+                    glosario = construir_glosario_icd11(payload.mensaje, payload.idioma)
+                    bloque_icd11 = glosario.get("bloque_contexto", "")
+                    yield _sse("icd11", glosario)
+                except Exception as exc:
+                    yield _sse("warning", {"message": f"No se pudo consultar ICD-11: {exc}", "tipo": "icd11"})
+
         sufijo = (
             instruccion_refuerzo_riesgo_personal(payload.idioma)
             if clasificacion["categoria"] == "riesgo_personal"
             else ""
         )
-        contexto = f"{bloque_pdf}\n{contexto_pubmed}".strip()
+        contexto = f"{bloque_pdf}\n{contexto_pubmed}\n{bloque_icd11}".strip()
         modelo = seleccionar_modelo_chat(
             tiene_evidencia=bool(contexto),
             categoria_riesgo=clasificacion["categoria"],
@@ -286,6 +376,7 @@ def _prepare_chat(payload: ChatRequest) -> tuple[dict[str, Any], Iterator[str]]:
             contexto,
         )
         messages[0] = construir_system_prompt(payload.idioma, payload.mensaje)
+        started = time.time()
         try:
             response = crear_completions_streaming(
                 client,
@@ -304,8 +395,55 @@ def _prepare_chat(payload: ChatRequest) -> tuple[dict[str, Any], Iterator[str]]:
                 if delta:
                     texto_completo += delta
                     yield _sse("token", {"content": delta})
-            yield _sse("done", {"content": texto_completo, "modelo": modelo})
+            respuesta_final = texto_completo
+            if papers or fragmentos:
+                contexto_revision = construir_contexto_para_juez(contexto_pubmed, bloque_pdf)
+                try:
+                    respuesta_final = revisar_respuesta_con_ia(
+                        respuesta_final, contexto_revision, payload.idioma
+                    )
+                    respuesta_final = normalizar_citas_pmid(respuesta_final, papers)
+                    respuesta_final = sincronizar_referencias_con_papers(
+                        respuesta_final, papers, payload.idioma
+                    )
+                except Exception as exc:
+                    yield _sse("warning", {"message": f"No se pudo verificar citas: {exc}", "tipo": "citas"})
+                fuera = detectar_citas_fuera_de_rango(
+                    respuesta_final, len(papers), len(fragmentos)
+                )
+                if fuera["papers_invalidos"] or fuera["fragmentos_invalidos"]:
+                    yield _sse("warning", {"message": "La respuesta contiene citas fuera de rango.", "citas": fuera})
+                if detectar_citas_alucinadas(respuesta_final, len(papers), len(fragmentos)):
+                    yield _sse("warning", {"message": "La respuesta contiene referencias no verificables.", "tipo": "citas"})
+                contradicciones = verificar_consistencia_fisiologica(
+                    payload.mensaje, respuesta_final
+                )
+                if contradicciones:
+                    yield _sse("physiology", {"contradicciones": contradicciones})
+                fuentes = construir_lista_fuentes(papers, fragmentos, respuesta_final)
+                yield _sse("sources", {"fuentes": fuentes, "resumen": resumen_evidencia_citada(fuentes)})
+                if payload.verificar_factualidad and fuentes:
+                    try:
+                        fact = evaluar_factualidad(
+                            respuesta_final,
+                            construir_contexto_para_juez(contexto_pubmed, bloque_pdf),
+                        )
+                        yield _sse("factuality", fact)
+                    except Exception as exc:
+                        yield _sse("warning", {"message": f"No se pudo verificar factualidad: {exc}", "tipo": "factualidad"})
+            registrar_evento(
+                usuario_id, "chat", modelo=modelo, estado="ok",
+                latencia_ms=int((time.time() - started) * 1000),
+                n_fuentes=len(papers) + len(fragmentos),
+                texto_consulta=payload.mensaje,
+            )
+            yield _sse("done", {"content": respuesta_final, "modelo": modelo})
         except Exception as exc:
+            registrar_evento(
+                usuario_id, "chat", modelo=modelo, estado="error",
+                latencia_ms=int((time.time() - started) * 1000),
+                texto_consulta=payload.mensaje,
+            )
             yield _sse("error", {"message": f"Error al consultar Groq: {exc}"})
 
     return {"clasificacion": clasificacion}, stream()
@@ -314,6 +452,9 @@ def _prepare_chat(payload: ChatRequest) -> tuple[dict[str, Any], Iterator[str]]:
 @app.post("/api/chat/stream")
 def chat_stream(payload: ChatRequest):
     initial, stream = _prepare_chat(payload)
+    if "limit" in initial:
+        content = iter([_sse("warning", initial["limit"]), _sse("done", {"content": ""})])
+        return StreamingResponse(content, media_type="text/event-stream")
     if "emergencia" in initial:
         content = iter(
             [
@@ -361,6 +502,18 @@ def calculator(payload: CalculatorRequest) -> dict[str, Any]:
 
 @app.post("/api/flashcards/generate")
 def generate_flashcards(payload: GenerateRequest) -> dict[str, Any]:
+    limite = verificar_limite(payload.usuario_id, "flashcards", payload.idioma)
+    if not limite["permitido"]:
+        raise HTTPException(status_code=429, detail=limite["motivo"])
+    registrar_solicitud(payload.usuario_id, "flashcards")
+    if not payload.fuente:
+        try:
+            fragments = buscar_fragmentos_relevantes(payload.usuario_id, payload.texto_fuente) if buscar_fragmentos_relevantes else []
+        except Exception:
+            fragments = []
+        if fragments:
+            payload.texto_fuente = "\n\n".join(item[2] for item in fragments)
+            payload.fuente = "Tus documentos"
     cards, diagnostic = generar_flashcards_con_ia(
         payload.usuario_id, payload.texto_fuente, payload.tema, payload.fuente,
         payload.n, payload.idioma,
@@ -390,6 +543,18 @@ def review_flashcard(payload: ReviewRequest) -> dict[str, Any]:
 
 @app.post("/api/examenes/generate")
 def generate_exam(payload: GenerateRequest) -> dict[str, Any]:
+    limite = verificar_limite(payload.usuario_id, "examen", payload.idioma)
+    if not limite["permitido"]:
+        raise HTTPException(status_code=429, detail=limite["motivo"])
+    registrar_solicitud(payload.usuario_id, "examen")
+    if not payload.fuente:
+        try:
+            fragments = buscar_fragmentos_relevantes(payload.usuario_id, payload.texto_fuente) if buscar_fragmentos_relevantes else []
+        except Exception:
+            fragments = []
+        if fragments:
+            payload.texto_fuente = "\n\n".join(item[2] for item in fragments)
+            payload.fuente = "Tus documentos"
     questions, diagnostic = generar_examen_con_ia(
         payload.usuario_id, payload.texto_fuente, payload.tema, payload.fuente,
         payload.n, payload.idioma,
@@ -413,6 +578,13 @@ def interactions(payload: InteractionRequest) -> dict[str, Any]:
     return verificar_interacciones(payload.farmacos)
 
 
+@app.post("/api/interacciones/ia")
+def interactions_ai(payload: InteractionAiRequest) -> dict[str, Any]:
+    return analizar_interaccion_con_ia(
+        payload.farmaco_a, payload.farmaco_b, idioma=payload.idioma
+    )
+
+
 @app.post("/api/uploads/pdf")
 async def upload_pdf(
     usuario_id: int = Form(...),
@@ -432,11 +604,26 @@ async def upload_pdf(
         fragmentos = guardar_fragmentos_pdf(
             usuario_id, nombre, texto, tipo_texto="ocr" if extraido["via_ocr"] else "normal"
         )
+        tablas_indexadas = 0
+        tablas = []
+        try:
+            tablas = extraer_tablas_pdf(ruta)
+        except Exception:
+            tablas = []
+        for tabla in tablas:
+            fuente_tabla = f"{nombre} · tabla {tabla['indice_en_pagina']} (pág. {tabla['pagina']})"
+            markdown, alertas_tabla = sanitizar_texto_pdf(tabla["markdown"])
+            alertas.extend(alertas_tabla)
+            if guardar_fragmentos_pdf(usuario_id, fuente_tabla, markdown, tipo_texto="tabla") > 0:
+                tablas_indexadas += 1
         return {
             "nombre": nombre,
             "fragmentos": fragmentos,
             "via_ocr": extraido["via_ocr"],
             "alertas_seguridad": alertas,
+            "resumen_alertas": resumir_alertas(alertas) if alertas else None,
+            "tablas": len(tablas),
+            "tablas_indexadas": tablas_indexadas,
             "caracteres": len(texto),
         }
     except ValueError as exc:
@@ -455,7 +642,89 @@ def progress(usuario_id: int | None = None) -> dict[str, Any]:
     }
 
 
-if STATIC_DIR.exists():
+@app.get("/api/options")
+def options() -> dict[str, Any]:
+    from pubmed_search import MODOS_EVIDENCIA
+    return {
+        "idiomas": [{"codigo": codigo, "nombre": config["nombre"]} for codigo, config in IDIOMAS.items()],
+        "modos_evidencia": list(MODOS_EVIDENCIA.keys()),
+        "limites": LIMITES,
+    }
+
+
+@app.post("/api/search/pubmed")
+def search_pubmed(payload: SearchRequest) -> dict[str, Any]:
+    limite = verificar_limite(payload.usuario_id, "pubmed", payload.idioma)
+    if not limite["permitido"]:
+        raise HTTPException(status_code=429, detail=limite["motivo"])
+    registrar_solicitud(payload.usuario_id, "pubmed")
+    papers, nuevos, total, debug, estado = buscar_pubmed_estructurado(
+        payload.consulta, payload.usuario_id
+    )
+    papers = filtrar_papers_por_evidencia(papers, payload.modo_evidencia)
+    return {
+        "papers": papers,
+        "nuevos": nuevos,
+        "total": total,
+        "debug": debug,
+        "estado": estado,
+    }
+
+
+@app.post("/api/search/europepmc")
+def search_europepmc(payload: SearchRequest) -> dict[str, Any]:
+    papers, debug = buscar_europepmc(
+        payload.consulta, retmax=payload.limite, rango_anios=payload.rango_anios
+    )
+    return {"papers": papers, "debug": debug}
+
+
+@app.post("/api/search/semantic-scholar")
+def search_semantic_scholar(payload: SearchRequest) -> dict[str, Any]:
+    papers, debug = buscar_semantic_scholar(
+        payload.consulta, limit=payload.limite, rango_anios=payload.rango_anios
+    )
+    return {"papers": papers, "debug": debug}
+
+
+@app.post("/api/icd11")
+def icd11(payload: IcdRequest) -> dict[str, Any]:
+    limite = verificar_limite(payload.usuario_id, "icd11", payload.idioma)
+    if not limite["permitido"]:
+        raise HTTPException(status_code=429, detail=limite["motivo"])
+    registrar_solicitud(payload.usuario_id, "icd11")
+    return construir_glosario_icd11(payload.pregunta, payload.idioma)
+
+
+@app.post("/api/feedback")
+def feedback(payload: FeedbackRequest) -> dict[str, bool]:
+    if payload.valoracion not in (-1, 1):
+        raise HTTPException(status_code=422, detail="La valoración debe ser -1 o 1")
+    saved = registrar_feedback(
+        payload.usuario_id, payload.chat_id, payload.pregunta, payload.respuesta,
+        payload.valoracion, payload.fuentes, payload.idioma,
+    )
+    if not saved:
+        raise HTTPException(status_code=500, detail="No se pudo guardar el feedback")
+    return {"saved": True}
+
+
+@app.get("/api/feedback/summary")
+def feedback_summary(dias: int = 30) -> dict[str, Any]:
+    return resumen_feedback(max(1, min(dias, 365)))
+
+
+@app.get("/api/auditoria")
+def audit_summary(usuario_id: int | None = None, dias: int = 7) -> list[dict[str, Any]]:
+    return obtener_resumen_auditoria(usuario_id, max(1, min(dias, 365)))
+
+
+@app.post("/api/uso")
+def usage_limit(payload: UsageRequest) -> dict[str, Any]:
+    return verificar_limite(payload.usuario_id, payload.tipo, payload.idioma)
+
+
+if (STATIC_DIR / "assets").exists():
     app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
 
 
