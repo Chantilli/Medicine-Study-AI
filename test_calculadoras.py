@@ -2,6 +2,7 @@ import pytest
 
 from calculadoras_clinicas import (
     calcular_aclaramiento_creatinina,
+    calcular_dosis_por_peso,
     calcular_imc,
     calcular_superficie_corporal,
 )
@@ -24,3 +25,9 @@ def test_aclaramiento_rechaza_datos_invalidos():
     assert "error" in calcular_aclaramiento_creatinina(
         edad=-1, peso_kg=70, creatinina_mg_dl=1, sexo="M", altura_cm=175
     )
+
+
+def test_dosis_ignora_numero_de_tomas_que_redondea_a_cero():
+    resultado = calcular_dosis_por_peso(70, 10, tomas_por_dia=0.5)
+    assert resultado["dosis_total_mg"] == 700.0
+    assert "dosis_por_toma_mg" not in resultado
