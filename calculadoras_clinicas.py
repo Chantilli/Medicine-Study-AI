@@ -267,8 +267,9 @@ def calcular_dosis_por_peso(peso_kg, mg_por_kg, dosis_max_mg=None,
         tomas_f = _a_float(tomas_por_dia)
         if tomas_f and tomas_f > 0:
             tomas_int = int(round(tomas_f))
-            resultado["dosis_por_toma_mg"] = round(dosis_total / tomas_int, 1)
-            resultado["tomas_por_dia"] = tomas_int
+            if tomas_int > 0:
+                resultado["dosis_por_toma_mg"] = round(dosis_total / tomas_int, 1)
+                resultado["tomas_por_dia"] = tomas_int
     except (TypeError, ValueError):
         pass
 
