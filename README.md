@@ -82,7 +82,9 @@ Arquitectura
                               │   + Auditoría (hash, no texto) + Feedback (👍/👎) │
                               └────────────────────────────────────────────────────┘
 
-La interfaz web actual se apoya en React + Vite + Tailwind y consume `api.py`.
+La interfaz web actual es HTML/CSS/JavaScript nativo y consume `api.py` directamente.
+El build solo copia `frontend/index.html`, `frontend/styles.css` y `frontend/app.js`
+a `frontend/dist`, sin runtime de React ni bundler.
 Los módulos Flet y PySide6 se conservan para compatibilidad local y no se eliminan.
 
 
@@ -116,7 +118,7 @@ UI responsive (sidebar colapsable en móvil), API keys opcionales para NCBI/Sema
 
 Stack tecnológico
 
-UI web: React + Vite + Tailwind, `react-markdown`/GFM, KaTeX y una vista de progreso preparada para Recharts
+UI web: HTML/CSS/JavaScript nativo, con streaming SSE, diseño responsive y estado local
 API: FastAPI, incluyendo streaming SSE de Groq al navegador
 UI legacy: Flet (Python → Flutter), conservada para compatibilidad local
 UI: PySide6 (Qt para Python), con login, chat, adjuntos PDF y calculadoras clínicas
@@ -146,18 +148,20 @@ python -m venv .venv
 pip install -r requirements.txt
 uvicorn api:app --reload --port 7860
 
-En otra terminal, para trabajar en la interfaz:
+Para preparar la interfaz web nativa localmente:
 
 cd frontend
 npm install
-npm run dev
+npm run build
 
 El frontend de producción se compila automáticamente dentro del Dockerfile
 multi-etapa. La imagen final contiene FastAPI y los estáticos compilados en un
 único contenedor y escucha en el puerto `7860`, compatible con el Space de
 Hugging Face.
 
-Para abrir la interfaz legacy de escritorio usa `APP_UI_MODE=qt python app.py`.
+Después ejecuta `uvicorn api:app --reload --port 7860`; la API sirve los
+archivos de `frontend/dist` en el mismo origen. Para abrir la interfaz legacy
+de escritorio usa `APP_UI_MODE=qt python app.py`.
 Para ejecutar únicamente la
 comprobación de búsqueda de PubMed sin abrir Qt:
 
@@ -205,7 +209,7 @@ Estructura de módulos
 
 app.py                          Punto de entrada legacy y self-test
 api.py                          API FastAPI, autenticación, calculadoras y SSE
-frontend/                       Aplicación React/Vite/Tailwind
+frontend/                       Aplicación web nativa HTML/CSS/JavaScript
 app_ui.py                       Vistas y chat principal de Flet (compatibilidad)
 app_ui.py                       También contiene la ventana PySide6 local
 ui_shell.py                      Layout responsive (sidebar móvil/escritorio)
